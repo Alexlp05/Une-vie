@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Une Vie — Simulation de destin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Écran titre -->
+    <section id="screen-title" class="screen">
+      <div class="title-card">
+        <p class="title-kicker">Une simulation de vie interactive</p>
+        <h1 class="title-main">Une Vie</h1>
+        <p class="title-sub">De la première bougie au dernier souffle, chaque décision écrit votre histoire.</p>
+        <button id="btn-start" class="btn btn-primary">Commencer une nouvelle vie</button>
+        <p class="title-hint">Santé · Énergie · Argent · Intelligence · Social · Bonheur</p>
+      </div>
+    </section>
+
+    <!-- Écran création -->
+    <section id="screen-creation" class="screen hidden">
+      <div class="creation-card">
+        <h2>Votre histoire commence ici</h2>
+        <label class="field-label" for="input-name">Votre prénom</label>
+        <input id="input-name" type="text" maxlength="20" placeholder="Ex : Camille">
+        <p class="field-label">Choisissez votre tempérament</p>
+        <div id="trait-list" class="trait-list"></div>
+        <p class="field-label">Votre famille d'origine
+          <button id="btn-reroll-origin" type="button" class="reroll-btn">🎲 Re-tirer</button>
+        </p>
+        <p class="origin-hint">Trois destins familiaux vous sont proposés au hasard. Ils ne décident pas de votre vie, mais ils vous offrent un point de départ.</p>
+        <div id="origin-list" class="origin-list"></div>
+        <button id="btn-create" class="btn btn-primary" disabled>Naître</button>
+      </div>
+    </section>
+
+    <!-- Écran de jeu -->
+    <section id="screen-game" class="screen hidden">
+      <header class="game-header">
+        <div class="identity">
+          <span class="badge-life" id="life-badge">Vie</span>
+          <h2 id="char-name">—</h2>
+          <span id="char-age" class="age-badge">Âge 0</span>
+        </div>
+        <div class="trait-line" id="char-trait"></div>
+      </header>
+
+      <div class="stats-grid" id="stats-grid"></div>
+
+      <div class="status-cards">
+        <div class="info-card" id="family-card"></div>
+        <div class="info-card" id="career-card"></div>
+        <div class="info-card" id="finances-card"></div>
+        <div class="info-card" id="world-card"></div>
+        <div class="info-card" id="passions-card"></div>
+        <div class="info-card" id="relations-card"></div>
+      </div>
+
+      <div id="year-fade" class="year-fade">
+        <div class="year-fade-inner">
+          <span class="year-fade-kicker">Année</span>
+          <span class="year-fade-num" id="year-fade-num">1995</span>
+          <ul class="year-fade-recap" id="year-fade-recap"></ul>
+        </div>
+      </div>
+
+      <div class="story-card">
+        <div class="story-stage" id="story-stage"></div>
+        <h3 class="story-title" id="story-title"></h3>
+        <p class="story-text" id="story-text"></p>
+        <div class="choices" id="choices"></div>
+      </div>
+
+      <div class="timeline-wrap">
+        <h3 class="timeline-title">Chronique de vie</h3>
+        <ul class="timeline" id="timeline"></ul>
+      </div>
+    </section>
+
+    <!-- Écran de fin -->
+    <section id="screen-end" class="screen hidden">
+      <div class="end-card">
+        <p class="title-kicker" id="end-kicker"></p>
+        <h2 class="end-title" id="end-title"></h2>
+        <p class="end-epitaph" id="end-epitaph"></p>
+        <div class="end-stats" id="end-stats"></div>
+        <div class="end-lifebox" id="end-career"></div>
+        <div class="end-lifebox" id="end-relations"></div>
+        <div class="end-lifebox" id="end-passions"></div>
+        <p class="end-score">Score d'héritage : <strong id="end-score">0</strong></p>
+        <p class="end-synopsis" id="end-synopsis"></p>
+        <div class="end-buttons">
+          <button id="btn-replay" class="btn btn-primary">Vivre une autre vie</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="data.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
