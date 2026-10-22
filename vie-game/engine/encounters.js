@@ -58,6 +58,10 @@
   }
 
   function statutFor(type, affection) {
+    // L'échelle de statuts est gérée par le module relations (source unique)
+    if (window.VIE.engine.relations && window.VIE.engine.relations.statutFromAffection) {
+      return window.VIE.engine.relations.statutFromAffection(type, affection);
+    }
     if (type === "amour") {
       if (affection >= 70) return "couple";
       if (affection >= 45) return "partenaire";
@@ -116,7 +120,9 @@
     });
     if (!person) return null;
 
-    var affection = opts.affection !== undefined ? opts.affection : 20 + Math.floor(Math.random() * 20);
+    var affection = opts.affection !== undefined ? opts.affection
+      : (type === "amour" ? 30 + Math.floor(Math.random() * 20)   // un coup de foudre marque plus
+                         : 20 + Math.floor(Math.random() * 20));
     var confiance = opts.confiance !== undefined ? opts.confiance : Math.round(affection * 0.7);
     var statut = opts.statut || statutFor(type, affection);
 
@@ -124,13 +130,16 @@
     person.liens = person.liens || [];
     person.liens.push(makePlayerLink(type, statut, affection, confiance, {
       depuis: state.year,
-      dernierContact: state.year
+      dernierContact: state.year,
+      connaissance: 60
     }));
 
     // Lien réciproque côté joueur
     if (!state.people[PLAYER_ID]) state.people[PLAYER_ID] = { id: PLAYER_ID, liens: [] };
     state.people[PLAYER_ID].liens = state.people[PLAYER_ID].liens || [];
-    state.people[PLAYER_ID].liens.push(makePlayerSideLink(person, type, statut, affection, confiance, state.year));
+    var sideLink = makePlayerSideLink(person, type, statut, affection, confiance, state.year);
+    sideLink.connaissance = 60;
+    state.people[PLAYER_ID].liens.push(sideLink);
 
     state.people[person.id] = person;
 
@@ -160,6 +169,44 @@
     // On privilégie les liens les plus récents et les plus forts
     candidates.sort(function (a, b) { return (b.affection || 0) - (a.affection || 0); });
     return state.people[candidates[0].id] || null;
+  }
+
+  /**
+   * Retrouve le PNJ lié au joueur pour un rôle donné.
+   * @param {object} state
+   * @param {string} role       "ami" | "amour" | "pro" | "enfant" | "famille"
+   * @param {number} minAffection  affection minimale requise
+   */
+  function findByRole(state, role, minAffection) {
+    if (!state.people) return null;
+    var self = state.people[PLAYER_ID];
+    if (!self || !self.liens) return null;
+    var best = null, bestAff = -1;
+    self.liens.forEach(function (l) {
+      if (l.role !== role) return;
+      if (minAffection && (l.affection || 0) < minAffection) return;
+      if ((l.affection || 0) > bestAff) { bestAff = l.affection || 0; best = l; }
+    });
+    if (!best) return null;
+    return state.people[best.id] || null;
+  }
+
+  /**
+   * Change le statut d'un lien (côté joueur et côté PNJ).
+   * @param {string} status "connaissance" | "flirt" | "couple" | "fiances" | "marie" | "ex" ...
+   */
+  function setStatus(state, personId, status) {
+    var self = state.people && state.people[PLAYER_ID];
+    if (self && self.liens) {
+      var l = self.liens.find(function (x) { return x.id === personId; });
+      if (l) l.statut = status;
+    }
+    var p = state.people && state.people[personId];
+    if (p && p.liens) {
+      var pl = p.liens.find(function (x) { return x.id === PLAYER_ID; });
+      if (pl) pl.statut = status;
+    }
+    return true;
   }
 
   // ── RENCONTRES ANNUELLES SPONTANÉES ──────────────────────
@@ -214,6 +261,8 @@
     meet: meet,
     annual: annual,
     findByType: findByType,
+    findByRole: findByRole,
+    setStatus: setStatus,
     makePlayerLink: makePlayerLink,
     makePlayerSideLink: makePlayerSideLink
   };

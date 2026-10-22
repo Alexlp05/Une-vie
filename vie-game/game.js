@@ -15,12 +15,21 @@
   var _lastStats = {};
   var _lastEventWasPassive = false;
   var gameOver = false;
+  var gameOverReason = null;
 
-  var STAT_KEYS = ["sante", "energie", "argent", "intelligence", "social", "bonheur"];
+  var STAT_KEYS = ["sante", "energie", "argent", "intelligence", "social", "bonheur", "stress", "apparence", "reputation", "confiance"];
   var STAT_LABELS = {
     sante: "Santé", energie: "Énergie", argent: "Argent",
-    intelligence: "Intelligence", social: "Social", bonheur: "Bonheur"
+    intelligence: "Intelligence", social: "Social", bonheur: "Bonheur",
+    stress: "Stress", apparence: "Apparence", reputation: "Réputation", confiance: "Confiance"
   };
+
+  var _statsBefore = {};
+  var _pendingDeltas = [];  // {stat, delta} à afficher au prochain render
+  var _impactQueue = [];    // file des impacts à afficher (stats, relations, passions, etc.)
+  var _showingImpact = false;
+  var _passiveBefore = null; // snapshot avant un événement passif
+  var _wishesPhase = false; // true pendant l'écran de vœux de fin d'année
 
   function $(sel) { return document.querySelector(sel); }
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -104,22 +113,29 @@
   }
 
   function showCreation() {
-    show("screen-creation");
-    renderTraits();
-    renderSexes();
-    renderOrigins();
-    if (window.VIE.ui.tabs && window.VIE.ui.tabs.init) window.VIE.ui.tabs.init();
+    try {
+        show("screen-creation");
+        renderTraits();
+        renderSexes();
+        renderBirthYears();
+        renderOrigins();
+        if (window.VIE.ui.tabs && window.VIE.ui.tabs.init) window.VIE.ui.tabs.init();
+    } catch (e) {
+        console.error("Erreur showCreation:", e);
+        alert("Erreur lors de l'ouverture de la création : " + e.message);
+    }
   }
 
   /* ---------- Création ---------- */
   var selectedTrait = null;
   var selectedOrigin = null;
   var selectedSexe = "homme";
+  var selectedBirthYear = null;
 
   function refreshCreateBtn() {
     var btn = $("#btn-create");
     if (!btn) return;
-    btn.disabled = !($("#input-name").value.trim() && selectedTrait && selectedOrigin && selectedSexe);
+    btn.disabled = !($("#input-name").value.trim() && selectedTrait && selectedOrigin && selectedSexe && selectedBirthYear !== null);
   }
 
   function renderTraits() {
@@ -169,6 +185,46 @@
     });
   }
 
+  function renderBirthYears() {
+    var list = $("#birth-year-list");
+    if (!list) return;
+    list.innerHTML = "";
+    selectedBirthYear = null;
+    var ctx = document.getElementById("era-context");
+    var cfg = window.VIE && window.VIE.config ? window.VIE.config : {};
+    var timeCfg = cfg.time || {};
+    var minY = timeCfg.startYearMin || 1970;
+    var maxY = timeCfg.startYearMax || 2010;
+
+    for (var y = minY; y <= maxY; y++) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "trait-option birth-year-option";
+      btn.textContent = y;
+      (function (yr) {
+        btn.addEventListener("click", function () {
+          var opts = list.querySelectorAll(".birth-year-option");
+          for (var i = 0; i < opts.length; i++) opts[i].classList.remove("selected");
+          btn.classList.add("selected");
+          selectedBirthYear = yr;
+          refreshCreateBtn();
+          var ec = cfg.eraContext && cfg.eraContext[yr];
+          if (ec && ctx) {
+            ctx.innerHTML = '<strong>' + ec.title + ' (' + ec.label + ')</strong> · ' + ec.desc;
+          } else if (ctx) {
+            ctx.textContent = "";
+          }
+        });
+      })(y);
+      list.appendChild(btn);
+    }
+
+    if (list.children.length > 0) {
+      var mid = Math.floor(list.children.length / 2);
+      if (list.children[mid]) list.children[mid].click();
+    }
+  }
+
   function renderOrigins() {
     var list = $("#origin-list");
     if (!list) return;
@@ -196,16 +252,21 @@
   function initCreation() {
     var btnCreate = $("#btn-create");
     if (btnCreate) btnCreate.addEventListener("click", function () {
-      var name = $("#input-name").value.trim();
-      if (!name || !selectedTrait || !selectedOrigin || !selectedSexe) return;
-      startGame(name, selectedTrait, selectedOrigin, selectedSexe);
+      try {
+        var name = $("#input-name").value.trim();
+        if (!name || !selectedTrait || !selectedOrigin || !selectedSexe || selectedBirthYear === null) return;
+        startGame(name, selectedTrait, selectedOrigin, selectedSexe, selectedBirthYear);
+      } catch (e) {
+        console.error("Erreur startGame:", e);
+        alert("Erreur lors du démarrage de la partie : " + e.message);
+      }
     });
     var btnReroll = $("#btn-reroll-origin");
     if (btnReroll) btnReroll.addEventListener("click", function () { renderOrigins(); });
   }
 
   /* ---------- Nouvelle partie ---------- */
-  function startGame(name, trait, origin, sexe) {
+  function startGame(name, trait, origin, sexe, birthYear) {
     var engine = window.VIE.engine;
     var base = engine.state ? engine.state.create() : {};
     var seed = Math.floor(Math.random() * 0x100000000);
@@ -228,8 +289,8 @@
     state.trait = trait;
     state.archetypeBias = trait.bias || {};
     state.rngSeed = seed;
-    state.year = 1990 + Math.floor(Math.random() * 20);
-    state.birthYear = state.year;
+    state.birthYear = birthYear || state.year;
+    state.year = state.birthYear;
     state.world = engine.world ? engine.world.create() : worldStart();
     state.stats = state.stats || { sante: 85, energie: 80, argent: 42, intelligence: 20, social: 20, bonheur: 60, stress: 10, apparence: 50, reputation: 50, confiance: 50 };
     state.habitudes = state.habitudes || { alcool: 0, tabac: 0, cannabis: 0, jeu: 0, sport: 0, alimentation: 50, sommeil: 50, ecrans: 0, soirees: 0, voyages: 0 };
@@ -241,6 +302,7 @@
     state.flags = state.flags || [];
     state.passions = state.passions || {};
     state.relations = state.relations || [];
+    state.wishes = state.wishes || []; // vœux de fin d'année actifs
     state.investments = state.investments || { stocks: 0, realEstate: 0, business: 0 };
 
     // Appliquer effets trait + origine
@@ -406,7 +468,7 @@
   }
 
   /* ---------- Rendu ---------- */
-  function renderAll() {
+  function renderAll(deltas) {
     renderHeader();
     renderStats();
     renderFamilyCard();
@@ -418,6 +480,10 @@
     if (window.VIE.ui.tabs && window.VIE.ui.tabs.getActive) {
       window.VIE.ui.tabs.renderActive(window.VIE.ui.tabs.getActive());
     }
+    renderTimeline();
+    // Afficher les impacts (deltas) des choix
+    if (deltas && deltas.length) showImpactPanel(deltas);
+    _pendingDeltas = [];
   }
 
   function renderHeader() {
@@ -551,6 +617,30 @@
     }).join("");
   }
 
+  // ── AFFICHAGE DES IMPACTS (DELTAS) DES CHOIX ─────────────
+  function showStatDeltas(deltas) {
+    var container = document.getElementById("delta-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "delta-container";
+      container.className = "delta-container";
+      var statsGrid = document.getElementById("stats-grid");
+      if (statsGrid) statsGrid.parentNode.insertBefore(container, statsGrid.nextSibling);
+    }
+    container.innerHTML = "";
+
+    var labels = STAT_LABELS;
+    deltas.forEach(function (d) {
+      var el = document.createElement("div");
+      el.className = "delta-indicator " + (d.delta > 0 ? "delta-up" : "delta-down");
+      el.textContent = (d.delta > 0 ? "+" : "") + d.delta + " " + (labels[d.stat] || d.stat);
+      container.appendChild(el);
+      // Auto-suppression après l'animation
+      setTimeout(function () { el.classList.add("delta-fade"); }, 700);
+      setTimeout(function () { if (el.parentNode === container) container.removeChild(el); }, 1400);
+    });
+  }
+
   /* ---------- Boucle de jeu ---------- */
   function playEvent(event) {
     if (!event) return;
@@ -559,6 +649,11 @@
     if (recentEvents.length > 12) recentEvents.shift();
 
     _lastEventWasPassive = event.passive || !event.choices || event.choices.length === 0;
+
+    // Snapshot avant pour les événements passifs (afin d'afficher les impacts après)
+    if (_lastEventWasPassive) {
+      _passiveBefore = captureImpactSnapshot();
+    }
 
     // Les événements passifs ne passent pas par resolveChoice :
     // on les enregistre auprès du moteur pour éviter les répétitions.
@@ -582,9 +677,14 @@
     choices.innerHTML = "";
 
     if (_lastEventWasPassive) {
+      // Panneau d'impact dédié pour les interludes (plus visible)
+      var after = captureImpactSnapshot();
+      var deltas = computeImpactDeltas(_passiveBefore || {}, after);
+      if (deltas && deltas.length) showImpactPanel(deltas);
+
       var cont = document.createElement("button");
       cont.type = "button";
-      cont.className = "choice-btn next-btn";
+      cont.className = "choice-btn next-btn passive-continue";
       cont.textContent = "Continuer";
       cont.addEventListener("click", function () { nextAction(); });
       choices.appendChild(cont);
@@ -606,6 +706,23 @@
     }
 
     renderAll();
+
+    // Marquer visuellement les événements passifs (interludes sans choix)
+    if (_lastEventWasPassive) {
+      var card = document.querySelector(".story-card");
+      if (card) {
+        card.classList.add("event-passive");
+        var badge = document.createElement("div");
+        badge.className = "passive-badge";
+        badge.textContent = "INTERLUDE — Tranche de vie";
+        card.insertBefore(badge, card.firstChild);
+      }
+      // Ajouter un petit délai avant de permettre le clic (lisibilité)
+      choices.style.opacity = "0";
+      choices.style.transition = "opacity 0.4s ease";
+      setTimeout(function () { choices.style.opacity = "1"; }, 400);
+    }
+
     var sc = document.querySelector(".story-card");
     if (sc && sc.scrollIntoView) sc.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -613,6 +730,9 @@
   function resolveChoice(event, choice, idx) {
     var engine = window.VIE.engine;
     var resultText = "";
+
+    // ── 1. Snapshot avant (stats, argent, relations, passions, traits) ──
+    var before = captureImpactSnapshot();
 
     if (engine.events && engine.events.resolveChoice) {
       var res = engine.events.resolveChoice(state, event, choice, idx, null);
@@ -626,13 +746,18 @@
       resultText = choice.result || "";
     }
 
-    // Afficher résultat + bouton suivant
+    // ── 2. Calculer les deltas d'impact ──
+    var after = captureImpactSnapshot();
+    var deltas = computeImpactDeltas(before, after);
+    _impactQueue = deltas;
+
+    // ── 3. Afficher résultat + bouton suivant ──
     var choices = $("#choices");
     choices.innerHTML = "";
-    var res = document.createElement("div");
-    res.className = "story-result";
-    res.textContent = resultText;
-    choices.appendChild(res);
+    var resEl = document.createElement("div");
+    resEl.className = "story-result";
+    resEl.textContent = resultText;
+    choices.appendChild(resEl);
 
     var next = document.createElement("button");
     next.type = "button";
@@ -641,7 +766,130 @@
     next.addEventListener("click", function () { nextAction(); });
     choices.appendChild(next);
 
-    renderAll();
+    renderAll(_impactQueue);
+    _impactQueue = [];
+  }
+
+  // ── Capture un instantané des valeurs suivies ──────────────────
+  function captureImpactSnapshot() {
+    var s = {};
+    STAT_KEYS.forEach(function (k) { s[k] = state.stats[k] || 0; });
+    s.money = state.finance && state.finance.compte !== undefined ? state.finance.compte : (state.money || 0);
+    s.passions = {};
+    Object.keys(state.passions || {}).forEach(function (k) { s.passions[k] = state.passions[k]; });
+    s.relations = {};
+    Object.keys(state.people || {}).forEach(function (pid) {
+      var p = state.people[pid];
+      (p.liens || []).forEach(function (l) {
+        if (l.id === "self") s.relations[p.id] = { affection: l.affection || 0, role: l.role || "", statut: l.statut || "" };
+      });
+    });
+    s.traits = (state.traits || []).slice();
+    s.flags = (state.flags || []).slice();
+    return s;
+  }
+
+  // ── Calculer les deltas entre deux instantanés ─────────────────
+  function computeImpactDeltas(before, after) {
+    var deltas = [];
+
+    // Stats
+    STAT_KEYS.forEach(function (k) {
+      var d = (after[k] || 0) - (before[k] || 0);
+      if (d !== 0) deltas.push({ type: "stat", stat: k, delta: d, label: STAT_LABELS[k] || k });
+    });
+
+    // Argent
+    var moneyD = (after.money || 0) - (before.money || 0);
+    if (moneyD !== 0) deltas.push({ type: "money", stat: "money", delta: moneyD, label: "Argent" });
+
+    // Passions (nouvelle ou modifiée)
+    var afterPassions = after.passions || {};
+    var beforePassions = before.passions || {};
+    Object.keys(afterPassions).forEach(function (k) {
+      var prev = beforePassions[k] || 0;
+      var curr = afterPassions[k] || 0;
+      if (curr !== prev) {
+        deltas.push({ type: "passion", stat: k, delta: curr - prev, label: k, newPassion: prev === 0 });
+      }
+    });
+
+    // Relations (nouvelle ou affection modifiée)
+    var afterRel = after.relations || {};
+    var beforeRel = before.relations || {};
+    Object.keys(afterRel).forEach(function (pid) {
+      var prev = beforeRel[pid];
+      var curr = afterRel[pid];
+      if (!prev) {
+        deltas.push({ type: "relation", stat: pid, delta: curr.affection, label: curr.affection > 0 ? "Nouvelle rencontre" : "", newRelation: true, personId: pid, personName: (state.people && state.people[pid] ? state.people[pid].prenom : pid) });
+      } else if (curr.affection !== prev.affection) {
+        deltas.push({ type: "relation", stat: pid, delta: curr.affection - prev.affection, label: "Lien avec " + (state.people && state.people[pid] ? state.people[pid].prenom : pid), personId: pid });
+      }
+    });
+
+    // Traits (nouveau trait acquis)
+    after.traits.forEach(function (t) {
+      if (before.traits.indexOf(t) < 0) {
+        deltas.push({ type: "trait", stat: t, delta: 1, label: "Nouveau trait : " + t, newTrait: true });
+      }
+    });
+
+    // Flags (nouveau flag)
+    after.flags.forEach(function (f) {
+      if (before.flags.indexOf(f) < 0) {
+        deltas.push({ type: "flag", stat: f, delta: 1, label: "Nouveau statut : " + f, newFlag: true });
+      }
+    });
+
+    return deltas;
+  }
+
+  // ── Panneau d'impact détaillé (affiché après chaque choix) ─────
+  function showImpactPanel(deltas) {
+    if (!deltas || deltas.length === 0) return;
+
+    var container = document.getElementById("impact-panel");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "impact-panel";
+      container.className = "impact-panel";
+      var storyCard = document.querySelector(".story-card");
+      if (storyCard && storyCard.parentNode) storyCard.parentNode.insertBefore(container, storyCard.nextSibling);
+    }
+
+    var html = '<div class="impact-header"><h4>▲ Impact de votre choix</h4></div>';
+    deltas.forEach(function (d) {
+      var sign = d.delta > 0 ? "+" : "";
+      var cls = d.delta > 0 ? "impact-up" : (d.delta < 0 ? "impact-down" : "impact-neutral");
+      var icon = "";
+      if (d.type === "money") icon = "💰";
+      else if (d.type === "passion") icon = "❤️";
+      else if (d.type === "relation") icon = "🤝";
+      else if (d.type === "trait") icon = "✨";
+      else if (d.type === "flag") icon = "🏷️";
+      else if (d.stat === "sante") icon = "❤️‍🩹";
+      else if (d.stat === "energie") icon = "⚡";
+      else if (d.stat === "argent") icon = "💵";
+      else if (d.stat === "bonheur") icon = "😊";
+      else if (d.stat === "social") icon = "👥";
+      else if (d.stat === "intelligence") icon = "🧠";
+      else if (d.stat === "stress") icon = "😰";
+      else if (d.stat === "apparence") icon = "🪞";
+      else if (d.stat === "reputation") icon = "🏆";
+      else if (d.stat === "confiance") icon = "🤗";
+
+      html += '<div class="impact-row ' + cls + '"><span class="impact-icon">' + icon + '</span><span class="impact-label">' + d.label + '</span><span class="impact-value">' + sign + d.delta + '</span></div>';
+    });
+
+    container.innerHTML = html;
+    container.classList.add("impact-show");
+
+    // Auto-masque après 2.5s
+    if (_impactTimer) clearTimeout(_impactTimer);
+    _impactTimer = setTimeout(function () {
+      container.classList.remove("impact-show");
+      setTimeout(function () { if (container.parentNode) container.innerHTML = ""; }, 400);
+    }, 2500);
   }
 
   function nextAction() {
@@ -682,6 +930,13 @@
     state.year++;
     state.age++;
     state.slot = 0;
+
+    // Vieillissement : la santé physique et l'énergie baissent avec l'âge
+    if (state.age > 45) {
+      var wear = (state.age - 45) * 0.06;
+      state.stats.sante = clamp(state.stats.sante - wear, 0, 100);
+      state.stats.energie = clamp(state.stats.energie - wear * 0.8, 0, 100);
+    }
 
     // Jalons d'âge : joués par le moteur (events.pickMilestone).
     // Ne jamais recaler l'âge ici (cela créait une boucle infinie au jalon 18).
@@ -728,6 +983,8 @@
     if (window.VIE.engine.relations) {
       if (window.VIE.engine.relations.accumulateTension) window.VIE.engine.relations.accumulateTension(state);
       if (window.VIE.engine.relations.spontaneousContacts) window.VIE.engine.relations.spontaneousContacts(state);
+      if (window.VIE.engine.relations.updateLinks) window.VIE.engine.relations.updateLinks(state);
+      if (window.VIE.engine.relations.erodeAll) window.VIE.engine.relations.erodeAll(state);
       if (window.VIE.engine.relations.progressHabits) window.VIE.engine.relations.progressHabits(state);
       if (window.VIE.engine.relations.progressRedemption) window.VIE.engine.relations.progressRedemption(state);
       if (window.VIE.engine.relations.checkSecrets) window.VIE.engine.relations.checkSecrets(state);
@@ -742,9 +999,14 @@
     }
 
     // Santé (mortalité joueur)
-    if (window.VIE.engine.health && window.VIE.engine.health.shouldDie) {
-      var me = state.people && state.people["self"];
-      if (me && window.VIE.engine.health.shouldDie(me, state)) { endGame("maladie"); return; }
+    // La santé physique du joueur suit la stat « santé » : c'est elle qui
+    // pilote le multiplicateur de mortalité.
+    var me = state.people && state.people["self"];
+    if (me) {
+      me.sante = clamp(state.stats.sante, 0, 100);
+      if (window.VIE.engine.health && window.VIE.engine.health.shouldDie) {
+        if (window.VIE.engine.health.shouldDie(me, state)) { endGame("maladie"); return; }
+      }
     }
 
     renderAll();
@@ -754,6 +1016,88 @@
     if (window.VIE.engine.save && window.VIE.engine.save.save) {
       try { window.VIE.engine.save.save("auto"); } catch (e) { /* sauvegarde non bloquante */ }
     }
+
+    // Vœux de fin d'année (à partir de 18 ans)
+    if (state.age >= 18 && !gameOver) {
+      makeWishes(state);
+    }
+  }
+
+  // ── VŒUX DE FIN D'ANNÉE ──────────────────────────────────────
+  // À chaque nouvelle année, le joueur choisit un vœu qui influencera
+  // les événements de l'année à venir.
+  var WISH_CATALOG = [
+    { id: "sante", label: "Bonne santé", desc: "Moins de risques de maladie, + événements santé.", icon: "❤️‍🩹", stat: "sante", bonus: 0.25 },
+    { id: "amour", label: "Rencontrer l'amour", desc: "+ chances de rencontre amoureuse.", icon: "💘", stat: "amour", bonus: 0.30 },
+    { id: "carriere", label: "Réussite professionnelle", desc: "+ chances de promotion/événements carrière.", icon: "💼", stat: "carriere", bonus: 0.25 },
+    { id: "argent", label: "Prospérité financière", desc: "+ chances d'événements financiers positifs.", icon: "💰", stat: "argent", bonus: 0.25 },
+    { id: "amitie", label: "Nouvelle amitié", desc: "+ chances de rencontre amicale.", icon: "🤝", stat: "amitie", bonus: 0.30 },
+    { id: "passion", label: "Découvrir une passion", desc: "+ chances de découvrir une nouvelle passion.", icon: "✨", stat: "passion", bonus: 0.30 },
+    { id: "tranquillite", label: "Tranquillité d'esprit", desc: "- Moins d'événements de crise.", icon: "🍃", stat: "tranquillite", bonus: 0.20 },
+    { id: "famille", label: "Lien familial", desc: "+ événements familiaux, liens renforcés.", icon: "👨‍👩‍👧‍👦", stat: "famille", bonus: 0.25 },
+    { id: "creativite", label: "Épanouissement créatif", desc: "+ événements artistiques et créatifs.", icon: "🎨", stat: "creativite", bonus: 0.25 },
+    { id: "voyage", label: "Voyages et découvertes", desc: "+ événements de voyage et de monde.", icon: "✈️", stat: "voyage", bonus: 0.25 }
+  ];
+
+  function makeWishes(state) {
+    _wishesPhase = true;
+
+    // Mélanger et prendre 3 vœux
+    var pool = WISH_CATALOG.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 3);
+
+    // Créer l'écran de vœux (overlay)
+    var overlay = document.createElement("div");
+    overlay.id = "wish-overlay";
+    overlay.className = "wish-overlay";
+    overlay.innerHTML = '<div class="wish-card"><div class="wish-header"><h2>🎯 Vœu de l’année ' + state.year + '</h2><p>Choisissez un vœu qui guidera votre prochaine année :</p></div><div class="wish-options" id="wish-options"></div><div class="wish-footer"><button id="wish-skip" class="btn btn-ghost btn-small">Passer</button></div></div>';
+    document.body.appendChild(overlay);
+
+    var optionsContainer = overlay.querySelector("#wish-options");
+    pool.forEach(function (w) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "wish-option";
+      btn.innerHTML = '<span class="wish-icon">' + w.icon + '</span><div class="wish-info"><div class="wish-title">' + w.label + '</div><div class="wish-desc">' + w.desc + '</div></div>';
+      btn.addEventListener("click", function () {
+        applyWish(state, w);
+        overlay.remove();
+        _wishesPhase = false;
+        renderAll();
+      });
+      optionsContainer.appendChild(btn);
+    });
+
+    // Bouton passer
+    overlay.querySelector("#wish-skip").addEventListener("click", function () {
+      overlay.remove();
+      _wishesPhase = false;
+      renderAll();
+    });
+
+    // Empêcher les clics en arrière-plan
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) overlay.querySelector("#wish-skip").click();
+    });
+  }
+
+  function applyWish(state, wish) {
+    // Supprimer les vœux expirés
+    state.wishes = (state.wishes || []).filter(function (w) {
+      return w.yearStart + w.duration > state.year;
+    });
+
+    // Ajouter le nouveau vœu
+    state.wishes.push({
+      id: wish.id,
+      label: wish.label,
+      stat: wish.stat,
+      bonus: wish.bonus,
+      yearStart: state.year,
+      duration: 1
+    });
+
+    // Afficher une confirmation toast
+    flash("Vœu enregistré : " + wish.label);
   }
 
   function showYearChange() {
@@ -786,6 +1130,7 @@
   function endGame(reason) {
     if (gameOver) return;
     gameOver = true;
+    gameOverReason = reason || "inconnu";
     var ending = (typeof ENDINGS !== "undefined" && ENDINGS[reason]) || { kicker: "La fin", epitaph: "Chaque vie est un voyage." };
     var title = state.life ? state.life : lifeTitle(state);
 
@@ -946,6 +1291,7 @@
     getState: function () { return state; },
     getStats: function () { return state ? state.stats : null; },
     isOver: function () { return gameOver; },
+    getEndReason: function () { return gameOverReason; },
     saveGame: saveGame,
     loadGame: loadGame,
     renderAll: renderAll,

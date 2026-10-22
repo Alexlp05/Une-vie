@@ -204,6 +204,18 @@
     var cfg = window.VIE.data.eventsConfig;
     if (!cfg) return pool.map(function (e) { return { item: e, weight: e.weight || 1 }; });
 
+    // Bonus des vœux de fin d'année (active pour 1 an)
+    // Calcul direct depuis state.wishes pour éviter toute dépendance à window.VIE.game
+    var wishBonuses = {};
+    if (state && state.wishes) {
+      var now = state.year || 0;
+      state.wishes.forEach(function (w) {
+        if (now < w.yearStart + w.duration) {
+          wishBonuses[w.stat] = (wishBonuses[w.stat] || 0) + (w.bonus || 0.20);
+        }
+      });
+    }
+
     return pool.map(function (e) {
       var weight = e.weight || 1;
       // Traits joueur
@@ -219,6 +231,13 @@
       if (state.stats.social < 30 && e.category === "rencontre") weight *= 1.5;
       if (state.stats.argent < 20 && e.category === "argent") weight *= 1.5;
       if (state.stats.sante < 30 && e.category === "sante") weight *= 1.5;
+      // Bonus vœux : booste les catégories/types correspondant au vœu
+      Object.keys(wishBonuses).forEach(function (wishStat) {
+        var mult = 1 + wishBonuses[wishStat];
+        if (e.category === wishStat || e.type === wishStat || e.stat === wishStat || e.id === wishStat) weight *= mult;
+        // Bonus spécial "tranquillite" : réduit les crises
+        if (wishStat === "tranquillite" && e.type === "crise") weight *= 0.5;
+      });
       return { item: e, weight: Math.max(0.1, weight) };
     });
   }
@@ -538,9 +557,43 @@
         if (person) notes.push("Nouvelle rencontre : " + person.prenom);
       }
 
+      // Sinon : on vise le partenaire existant du bon type
+      if (!person && window.VIE.engine.encounters) {
+        person = window.VIE.engine.encounters.findByRole(state, fx.relation.type || "amour");
+      }
+
       if (person) {
         applyRelationToPerson(state, person, fx.relation);
         notes.push("Lien avec " + person.prenom + " mis à jour");
+
+        // Le mariage est un statut de lien, pas seulement un flag
+        if (fx.flag === "marie") {
+          window.VIE.engine.encounters.setStatus(state, person.id, "marie");
+          state.history = state.history || [];
+          state.history.push({
+            age: state.age, year: state.year,
+            title: "Mariage avec " + person.prenom,
+            result: "Vous vous mariez. Deux vies, un même chemin.",
+            type: "relation", peopleIds: [person.id]
+          });
+        }
+        if (fx.flag === "divorce") {
+          window.VIE.engine.encounters.setStatus(state, person.id, "ex");
+          state.history = state.history || [];
+          state.history.push({
+            age: state.age, year: state.year,
+            title: "Divorce avec " + person.prenom,
+            result: "Vous prenez vos chemins séparés.",
+            type: "relation", peopleIds: [person.id]
+          });
+        }
+        // Infidélité : un secret est enfoui chez le partenaire
+        if (fx.flag === "infidelite") {
+          person.memoire = person.memoire || {};
+          person.memoire.infidelite = { decouvert: false, depuis: state.year };
+          person.secrets = person.secrets || [];
+          if (person.secrets.indexOf("infidelite") < 0) person.secrets.push("infidelite");
+        }
       }
     }
 
@@ -573,8 +626,14 @@
     }
 
     // Habitudes
-    if (fx.habit) {
-      var h = fx.habit, d = fx.habitDelta || 5;
+    // Le champ peut être au premier niveau (`fx.habit`) ou imbriqué dans
+    // `effects` (format utilisé par les événements « vices »).
+    var habitKey = fx.habit || (fx.effects && fx.effects.habit);
+    if (habitKey) {
+      var h = habitKey;
+      var d = fx.habitDelta !== undefined ? fx.habitDelta
+            : (fx.effects && fx.effects.habitDelta !== undefined ? fx.effects.habitDelta : 5);
+      state.habitudes = state.habitudes || {};
       state.habitudes[h] = clamp((state.habitudes[h] || 0) + d, 0, 100);
       notes.push("Habitude " + h + " " + (d > 0 ? "+" : "") + d);
     }

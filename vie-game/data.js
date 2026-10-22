@@ -244,6 +244,7 @@ function ev(stage, id, title, text, choices, opts) {
     text: text,
     choices: choices,
     type: opts.type || "vie",
+    category: opts.category || null,
     weight: opts.weight || 1,
     once: opts.once !== false,
     minAge: opts.minAge || null,
@@ -1284,6 +1285,65 @@ ev("maturite", "reconversion-carriere", "Le doute professionnel",
     { text: "Tenir jusqu'à la retraite, raisonnablement.",
       effects: { argent: 10, bonheur: -5 }, result: "La sécurité avant tout. Le costume reste, le rêve aussi." }
   ], { type: "carriere", requiresCareer: true });
+
+/* ------------------------------------------------------------
+   ÉVÉNEMENTS DE COUPLE — divorce, infidélité, profondeur des liens
+   ------------------------------------------------------------ */
+ev("adulte", "divorce", "La séparation",
+  "Les mots ont cessé de se répondre. Les silences se sont installés, puis ont pris toute la place. Ce matin, vous avez parlé de la maison — et de tout le reste.",
+  [
+    { text: "Tenter de sauver ce qui peut l'être.",
+      effects: { bonheur: -5, stress: 12, argent: -8 },
+      result: "Vous essayez. Les mots restent prudents, mais quelque chose survit. Pas tout." },
+    { text: "Prendre de la distance, doucement.",
+      effects: { stress: 5, bonheur: 3 },
+      result: "Vous prenez de la hauteur. La maison se vide doucement, sans bruit." },
+    { text: "Signer la séparation, et recommencer ailleurs.",
+      flag: "divorce", relation: { type: "amour", delta: -60 },
+      effects: { stress: 10, bonheur: -12, argent: -15, social: -5 },
+      result: "C'est signé. Vous êtes deux, à nouveau. La liberté a un goût de liberté amère." }
+  ], { type: "relation", category: "divorce", requiresFlag: "marie", once: false });
+
+ev("adulte", "tentation", "La tentation",
+  "Quelqu'un croise votre route un soir un peu trop tard. Les yeux se posent, un peu trop longtemps. Vous savez comment cela se termine — et ce que cela vous coûtera.",
+  [
+    { text: "Ne rien dire. Laisser la porte entrouverte.",
+      flag: "infidelite", relation: { type: "amour", delta: 5 },
+      effects: { bonheur: 8, stress: 6 },
+      result: "C'est arrivé. Le silence pèse plus lourd que la faute." },
+    { text: "Repartir. Rester fidèle à ce que vous avez choisi.",
+      relation: { type: "amour", delta: 12 },
+      effects: { bonheur: 3, confiance: 8 },
+      result: "Vous rentrez chez vous. Le soulagement est plus fort que le regret." },
+    { text: "En parler, avant que cela n'éclate.",
+      effects: { stress: 10, bonheur: -4, social: 4 },
+      result: "La vérité, dite à moitié. Le couple vacille, mais il ne s'effondre pas." }
+  ], { type: "relation", category: "infidelite", requiresRelation: { type: "amour", minBond: 30 }, once: false });
+
+ev("jeune", "ami-proche", "L'ami que l'on garde",
+  "Un message à 2 h du matin, une blague sortie au mauvais moment, un coup de main sans rien attendre. Vous comprenez que certaines présences ne se rattrapent pas.",
+  [
+    { text: "Lui rendre la pareille, sans compter.",
+      relation: { type: "ami", delta: 25 },
+      effects: { bonheur: 10, social: 6 },
+      result: "L'amitié se densifie. Vous avez un roc, et il sait que vous êtes son appui aussi." },
+    { text: "Laisser la relation se diluer, doucement.",
+      relation: { type: "ami", delta: -12 },
+      effects: { bonheur: -3 },
+      result: "Les messages s'espacent. L'amitié reste, mais elle ne bat plus." }
+  ], { type: "relation", category: "amitie", requiresRelation: { type: "ami", minBond: 25 }, once: false });
+
+ev("adulte", "retour-aux-sources", "Les retrouvailles",
+  "Un prénom sur une liste d'anciens élèves. Un café, puis un autre. Vous avancez, et pourtant ce sont les mêmes ponts, les mêmes histoires.",
+  [
+    { text: "Retrouver le chemin de l'amitié.",
+      relation: { type: "ami", delta: 20 },
+      effects: { bonheur: 8, social: 5 },
+      result: "Le temps reprend ses marques. Vous repartez avec des rires et un numéro." },
+    { text: "Rester sur une note agréable, sans plus.",
+      effects: { bonheur: 3 },
+      result: "C'était bien. Assez pour refermer la porte." }
+  ], { type: "relation", once: false });
 
 /* ------------------------------------------------------------
    ÉVÉNEMENTS DE RENCONTRE & RELATIONS

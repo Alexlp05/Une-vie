@@ -24,6 +24,9 @@ var EVENTS_CONFIG = {
     dispute: 2,
     reconciliation: 2,
     infidelite: 3,
+    infidelite: 15,
+    divorce: 10,
+    amitie: 2,
     secret_revele: 3
   },
 

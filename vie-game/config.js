@@ -16,7 +16,7 @@ var CONFIG = {
 
   // ── TEMPS & ÂGES ─────────────────────────────────────────
   time: {
-    startYearMin: 1990,
+    startYearMin: 1970,
     startYearMax: 2010,
     maxAge: 120,
     // Actions par an selon l'âge (remplace STAGE_SLOTS)
@@ -108,14 +108,22 @@ var CONFIG = {
     maxTotalPeople: 150,         // plafond génération
     // Érosion annuelle d'affection si pas de contact
     erosion: {
-      base: 3,
+      base: 1.5,
       loyalReduction: 0.5,
       childhoodBondReduction: 0.3,
       distanceFactor: 1.5,
       busyFactor: 1.2
     },
     // Contact spontané PNJ → joueur
-    spontaneousContactChance: 0.15,
+    spontaneousContactChance: 0.30,
+    // Densification annuelle d'un lien, par type de relation
+    linkGrowth: {
+      famille: 3.0,
+      enfant: 3.0,
+      amour: 2.5,
+      ami: 2.5,
+      pro: 1.2
+    },
     // Rencontres nouvelles : nombre maximal de nouvelles personnes par an
     // selon l'âge, et poids par type de relation
     encounters: {
@@ -123,10 +131,10 @@ var CONFIG = {
       byAge: [
         { ageMax: 4,   chance: 0.15, types: { ami: 1, famille: 0.4 } },
         { ageMax: 11,  chance: 0.45, types: { ami: 1, pro: 0.1 } },
-        { ageMax: 17,  chance: 0.55, types: { ami: 1, amour: 0.25, pro: 0.2 } },
-        { ageMax: 24,  chance: 0.70, types: { ami: 1, amour: 0.6, pro: 0.8 } },
-        { ageMax: 39,  chance: 0.60, types: { ami: 0.9, amour: 0.5, pro: 0.9 } },
-        { ageMax: 59,  chance: 0.45, types: { ami: 0.8, amour: 0.3, pro: 0.7 } },
+        { ageMax: 17,  chance: 0.55, types: { ami: 1, amour: 0.5, pro: 0.2 } },
+        { ageMax: 24,  chance: 0.70, types: { ami: 1, amour: 1.0, pro: 0.8 } },
+        { ageMax: 39,  chance: 0.60, types: { ami: 0.9, amour: 0.8, pro: 0.9 } },
+        { ageMax: 59,  chance: 0.45, types: { ami: 0.8, amour: 0.4, pro: 0.7 } },
         { ageMax: 74,  chance: 0.35, types: { ami: 1, amour: 0.15, pro: 0.3 } },
         { ageMax: 120, chance: 0.25, types: { ami: 1, pro: 0.1 } }
       ]
@@ -238,9 +246,11 @@ var CONFIG = {
   // ── SANTÉ & MORTALITÉ ────────────────────────────────────
   health: {
     // Mortalité Gompertz : q(age) = a * exp(b * age)
+    // Calibré pour une espérance de vie e(0) = (1/b)*ln(1 + b/a)
+    //   homme : ~81 ans, femme : ~84 ans (ordre de grandeur FR)
     gompertz: {
-      homme: { a: 0.00012, b: 0.095 },
-      femme: { a: 0.00008, b: 0.095 }
+      homme: { a: 0.000047, b: 0.0925 },
+      femme: { a: 0.000040, b: 0.0925 }
     },
     // Facteurs multiplicateurs mortalité
     mortalityFactors: {
@@ -297,7 +307,50 @@ var CONFIG = {
     ]
   },
 
-  // ── ÉVÉNEMENTS ───────────────────────────────────────────
+  // ── ÉPOQUES DU XXe SIÈCLE (contexte à la naissance) ───────────
+  eraContext: {
+    1970: { label: "1970", title: "Les années 70", desc: "Trente Glorieuses qui s'achèvent, premiers chocs pétroliers, naissance de l'informatique personnelle." },
+    1971: { label: "1971", title: "Les années 70", desc: "Trente Glorieuses qui s'achèvent, premiers chocs pétroliers, naissance de l'informatique personnelle." },
+    1972: { label: "1972", title: "Les années 70", desc: "Trente Glorieuses qui s'achèvent, premiers chocs pétroliers, naissance de l'informatique personnelle." },
+    1973: { label: "1973", title: "Les années 70", desc: "Premier choc pétrolier, fin de la croissance d'après-guerre, montée des crises." },
+    1974: { label: "1974", title: "Les années 70", desc: "Premier choc pétrolier, fin de la croissance d'après-guerre, montée des crises." },
+    1975: { label: "1975", title: "Les années 70", desc: "Fin de la croissance d'après-guerre, montée des crises économiques et sociales." },
+    1976: { label: "1976", title: "Les années 70", desc: "Fin de la croissance d'après-guerre, montée des crises économiques et sociales." },
+    1977: { label: "1977", title: "Les années 70", desc: "Montée des crises économiques, émergence des mouvements sociaux et écologiques." },
+    1978: { label: "1978", title: "Les années 70", desc: "Montée des crises économiques, émergence des mouvements sociaux et écologiques." },
+    1979: { label: "1979", title: "Les années 70", desc: "Second choc pétrolier, instabilité économique mondiale." },
+    1980: { label: "1980", title: "Les années 80", desc: "Émergence de l'informatique personnelle, premier Minitel, culture punk et new wave." },
+    1981: { label: "1981", title: "Les années 80", desc: "Émergence de l'informatique personnelle, premier Minitel, culture punk et new wave." },
+    1982: { label: "1982", title: "Les années 80", desc: "Émergence de l'informatique personnelle, premier Minitel, culture punk et new wave." },
+    1983: { label: "1983", title: "Les années 80", desc: "Premier téléphone mobile, naissance d'Internet (TCP/IP), société de consommation." },
+    1984: { label: "1984", title: "Les années 80", desc: "Premier téléphone mobile, naissance d'Internet (TCP/IP), société de consommation." },
+    1985: { label: "1985", title: "Les années 80", desc: "Windows 1.0, premier Mac,essor de la culture de consommation et des médias." },
+    1986: { label: "1986", title: "Les années 80", desc: "Tchernobyl, mondialisation des marchés financiers, émergence du sida." },
+    1987: { label: "1987", title: "Les années 80", desc: "Krach boursier de 1987, mondialisation, émergence du sida." },
+    1988: { label: "1988", title: "Les années 80", desc: "Mondialisation, émergence du sida, premiers ordinateurs personnels dans les foyers." },
+    1989: { label: "1989", title: "Les années 80", desc: "Chute du mur de Berlin, fin de la guerre froide, émergence du World Wide Web." },
+    1990: { label: "1990", title: "Les années 90", desc: "Chute du mur de Berlin, émergence du Web, mondialisation accélérée." },
+    1991: { label: "1991", title: "Les années 90", desc: "Guerre du Golfe, dissolution de l'URSS, premier navigateur web." },
+    1992: { label: "1992", title: "Les années 90", desc: "Traité de Maastricht, emergence d'Internet grand public." },
+    1993: { label: "1993", title: "Les années 90", desc: "Naissance du navigateur Mosaic, émergence du Web grand public." },
+    1994: { label: "1994", title: "Les années 90", desc: "Netscape, Amazon, émergence du commerce en ligne." },
+    1995: { label: "1995", title: "Les années 90", desc: "Windows 95, explosion d'Internet, émergence des premiers portails web." },
+    1996: { label: "1996", title: "Les années 90", desc: "Téléphone portable démocratisé, émergence des premiers sites web personnels." },
+    1997: { label: "1997", title: "Les années 90", desc: "Asie en crise financière, émergence du web 1.0 et des premiers emails." },
+    1998: { label: "1998", title: "Les années 90", desc: "Fondation de Google, krach des marchés émergents, boom d'Internet." },
+    1999: { label: "1999", title: "Les années 90", desc: "Effet an 2000, bulle Internet, émergence du commerce électronique." },
+    2000: { label: "2000", title: "Les années 2000", desc: "An 2000, bulle Internet qui éclate, émergence du haut débit." },
+    2001: { label: "2001", title: "Les années 2000", desc: "Attentats du 11 septembre, iPod, émergence du haut débit." },
+    2002: { label: "2002", title: "Les années 2000", desc: "Euro monnaie, émergence du haut débit et des premiers forums web." },
+    2003: { label: "2003", title: "Les années 2000", desc: "Guerre d'Iraq, emergence du haut débit et des premiers forums web." },
+    2004: { label: "2004", title: "Les années 2000", desc: "Facebook, emergence des réseaux sociaux, bulle Internet terminée." },
+    2005: { label: "2005", title: "Les années 2000", desc: "YouTube, émergence des réseaux sociaux et du web 2.0." },
+    2006: { label: "2006", title: "Les années 2000", desc: "Twitter, émergence des réseaux sociaux et du web 2.0." },
+    2007: { label: "2007", title: "Les années 2000", desc: "Premier iPhone, émergence du smartphone et du web mobile." },
+    2008: { label: "2008", title: "Les années 2000", desc: "Crise financière mondiale, premier iPhone 3G, émergence du web mobile." },
+    2009: { label: "2009", title: "Les années 2000", desc: "Après-crise financière, émergence du smartphone et du web mobile." },
+    2010: { label: "2010", title: "Les années 2010", desc: "Instagram, émergence du smartphone dominant et du web social." }
+  },
   events: {
     // Anti-répétition
     recentMemorySize: 30,              // ~5-6 ans avec 5 actions/an

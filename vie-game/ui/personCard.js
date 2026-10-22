@@ -12,42 +12,80 @@
     var panel = document.getElementById("panel-proches");
     if (!panel) return;
 
-    var people = Object.values(state.people || {}).filter(function (p) { return p.vivant; });
-    var groups = {
-      famille: people.filter(function (p) { return p.liens.some(function (l) { return l.role === "famille" || ["parent", "mere", "pere", "frere", "soeur", "enfant", "conjoint", "ex", "grand_parent"].includes(l.role); }); }),
-      amour: people.filter(function (p) { return p.liens.some(function (l) { return l.role === "amour"; }); }),
-      amis: people.filter(function (p) { return p.liens.some(function (l) { return ["ami", "ami_proche", "meilleur_ami", "connaissance", "copain"].includes(l.role); }); }),
-      pro: people.filter(function (p) { return p.liens.some(function (l) { return ["collegue", "superieur", "subordonne", "mentor", "associe", "client", "concurrent"].includes(l.role); }); }),
-      autres: people.filter(function (p) { return p.liens.some(function (l) { return !["famille", "amour", "ami", "ami_proche", "meilleur_ami", "connaissance", "copain", "collegue", "superieur", "subordonne", "mentor", "associe", "client", "concurrent", "parent", "mere", "pere", "frere", "soeur", "enfant", "conjoint", "ex"].includes(l.role); }); })
+    var people = Object.values(state.people || {}).filter(function (p) { return p.vivant && p.id !== "self"; });
+
+    // Sous-catégories par statut pour plus de granularité
+    var statutAmour = ["crush", "flirt", "aventure", "relation", "couple_installe", "fiances", "marie", "ex", "separe", "divorce"];
+    var statutAmi = ["connaissance", "copain", "ami", "ami_proche", "meilleur_ami", "ami_poison", "ex_ami", "rival"];
+    var statutFamille = ["proche", "distants", "brouilles", "coupes", "reconcilles", "en_deuil"];
+
+    var statutLabel = {
+      // Amour
+      crush: "💘 Crush", flirt: "😘 Flirt", aventure: "🔥 Aventure", relation: "💞 Relation",
+      couple_installe: "💍 Couple installé", fiances: "💍 Fiançailles", marie: "👰 Marié(e)",
+      ex: "💔 Ex", separe: "💔 Séparé(e)", divorce: "⚖️ Divorcé(e)",
+      // Amitié
+      connaissance: "👋 Connaissance", copain: "👥 Copain", ami: "🤝 Ami",
+      ami_proche: "❤️ Ami proche", meilleur_ami: "💎 Meilleur ami",
+      ami_poison: "☠️ Ami toxique", ex_ami: "💔 Ex-ami", rival: "⚔️ Rival",
+      // Famille
+      proche: "❤️ Proche", distants: "📏 Distant", brouilles: "⚡ Brouillé",
+      coupes: "✂️ Coupé", reconcilles: "✨ Réconcilié", en_deuil: "🕯️ En deuil"
     };
 
-    var html = "";
+    // Grouper par catégorie principale puis par statut
+    var groups = {};
+
+    people.forEach(function (p) {
+      var lien = p.liens.find(function (l) { return l.id === "self"; }) || {};
+      var role = lien.role || "";
+      var statut = lien.statut || "";
+
+      var cat = "autres";
+      if (role === "famille" || ["parent", "mere", "pere", "frere", "soeur", "enfant", "conjoint", "ex", "grand_parent"].includes(role)) cat = "famille";
+      else if (role === "amour") cat = "amour";
+      else if (["ami", "ami_proche", "meilleur_ami", "connaissance", "copain"].includes(role)) cat = "amis";
+      else if (["collegue", "superieur", "subordonne", "mentor", "associe", "client", "concurrent"].includes(role)) cat = "pro";
+
+      if (!groups[cat]) groups[cat] = {};
+      if (!groups[cat][statut]) groups[cat][statut] = [];
+      groups[cat][statut].push({ p: p, lien: lien });
+    });
+
     var groupLabels = { famille: "👨‍👩‍👧‍👦 Famille", amour: "💕 Amour", amis: "🤝 Amis", pro: "💼 Pro", autres: "🌐 Autres" };
 
-    Object.keys(groups).forEach(function (key) {
-      var list = groups[key];
-      if (!list.length) return;
+    var html = "";
+
+    // Ordre d'affichage des catégories
+    var catOrder = ["famille", "amour", "amis", "pro", "autres"];
+
+    catOrder.forEach(function (key) {
+      var catGroups = groups[key];
+      if (!catGroups) return;
+
       html += '<div class="people-group"><h4>' + groupLabels[key] + '</h4><div class="people-list">';
-      list.forEach(function (p) {
-        var lien = p.liens.find(function (l) { return l.affection > 0; }) || {};
-        var age = state.year - p.naissance;
-        var affection = lien.affection || 0;
-        var tension = lien.tension || 0;
-        var traits = (p.traits || []).slice(0, 3).map(function (t) { return '<span class="trait-tag">' + t + '</span>'; }).join("");
-        var alertClass = tension > 50 ? "alert" : (p.humeur < 30 ? "low-mood" : "");
-        html += '<div class="person-row ' + alertClass + '" data-person-id="' + p.id + '">';
-        html += '<span class="person-avatar">' + (p.prenom || "?")[0].toUpperCase() + '</span>';
-        html += '<div class="person-info">';
-        html += '<span class="person-name">' + (p.prenom || "") + ' ' + (p.nom || "") + '</span>';
-        html += '<span class="person-meta">' + age + ' ans · ' + (p.metier || "") + ' · ' + (lien.role || "") + '</span>';
-        html += '<div class="person-bars">';
-        html += '<div class="bar"><div class="bar-fill affection" style="width:' + affection + '%"></div></div>';
-        if (lien.attraction) html += '<div class="bar"><div class="bar-fill attraction" style="width:' + lien.attraction + '%"></div></div>';
-        if (tension > 30) html += '<div class="bar"><div class="bar-fill tension" style="width:' + tension + '%"></div></div>';
-        html += '</div>';
-        html += '<div class="person-traits">' + traits + '</div>';
-        html += '</div></div>';
+
+      // Ordre des statuts pour chaque catégorie
+      var statutOrder = [];
+      if (key === "amour") statutOrder = statutAmour;
+      else if (key === "amis") statutOrder = statutAmi;
+      else if (key === "famille") statutOrder = statutFamille;
+
+      // Afficher les statuts dans l'ordre, puis les restants
+      var displayedStatuts = [];
+      statutOrder.forEach(function (s) {
+        if (catGroups[s]) {
+          displayedStatuts.push(s);
+          html += renderStatutBlock(state, catGroups[s], s, statutLabel[s] || s);
+        }
       });
+      // Statuts non classés
+      Object.keys(catGroups).forEach(function (s) {
+        if (displayedStatuts.indexOf(s) < 0) {
+          html += renderStatutBlock(state, catGroups[s], s, statutLabel[s] || s);
+        }
+      });
+
       html += '</div></div>';
     });
 
@@ -57,6 +95,43 @@
     panel.querySelectorAll(".person-row").forEach(function (row) {
       row.addEventListener("click", function () { openPersonCard(this.dataset.personId); });
     });
+  }
+
+  function renderStatutBlock(state, items, statut, label) {
+    if (!items || !items.length) return "";
+
+    // Trier par affection décroissante
+    items.sort(function (a, b) {
+      return (b.lien.affection || 0) - (a.lien.affection || 0);
+    });
+
+    var html = "";
+    html += '<div class="statut-block">';
+    html += '<div class="statut-header"><span class="statut-title">' + label + '</span><span class="statut-count">(' + items.length + ')</span></div>';
+    html += '<div class="people-list">';
+    items.forEach(function (item) {
+      var p = item.p;
+      var lien = item.lien;
+      var age = state.year - p.naissance;
+      var affection = lien.affection || 0;
+      var tension = lien.tension || 0;
+      var traits = (p.traits || []).slice(0, 3).map(function (t) { return '<span class="trait-tag">' + t + '</span>'; }).join("");
+      var alertClass = tension > 50 ? "alert" : (p.humeur < 30 ? "low-mood" : "");
+      html += '<div class="person-row ' + alertClass + '" data-person-id="' + p.id + '">';
+      html += '<span class="person-avatar">' + (p.prenom || "?")[0].toUpperCase() + '</span>';
+      html += '<div class="person-info">';
+      html += '<span class="person-name">' + (p.prenom || "") + ' ' + (p.nom || "") + '</span>';
+      html += '<span class="person-meta">' + age + ' ans · ' + (p.metier || "") + ' · ' + (statut || "") + '</span>';
+      html += '<div class="person-bars">';
+      html += '<div class="bar"><div class="bar-fill affection" style="width:' + affection + '%"></div></div>';
+      if (lien.attraction) html += '<div class="bar"><div class="bar-fill attraction" style="width:' + lien.attraction + '%"></div></div>';
+      if (tension > 30) html += '<div class="bar"><div class="bar-fill tension" style="width:' + tension + '%"></div></div>';
+      html += '</div>';
+      html += '<div class="person-traits">' + traits + '</div>';
+      html += '</div></div>';
+    });
+    html += '</div></div>';
+    return html;
   }
 
   // ── FICHE PERSONNE (modale/panneau) ───────────────────────

@@ -56,8 +56,10 @@
     if (!person.vivant) return;
     var age = state.year - person.naissance;
 
-    // Vieillissement naturel
-    var decay = age * 0.08; // ~8 points par décennie
+    // Vieillissement naturel : ~0,4 pt/an jusqu'à 30 ans,
+    // puis +0,2 pt par décennie au-delà (et non `age * x` par an,
+    // ce qui effondrait la santé bien trop vite).
+    var decay = 0.4 + Math.max(0, age - 30) * 0.02;
     person.sante = clamp(person.sante - decay + (Math.random() - 0.5) * 3, 0, 100);
 
     // Facteurs positifs

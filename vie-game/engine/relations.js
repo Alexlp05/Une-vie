@@ -132,6 +132,55 @@
   }
 
   // ── ÉROSION ANNUELLE ─────────────────────────────────────
+  // ── DYNAMIQUE ANNUELLE DES LIENS (§5.2) ───────────────────
+  // Un lien entretenu se densifie (connaissance → affection → confiance),
+  // un lien négligé s'efface. Appliqué chaque année.
+  function updateLinks(state) {
+    var cfg = window.VIE.config.relations;
+    var growth = cfg.linkGrowth || {};
+    var self = state.people && state.people["self"];
+    if (!self) return;
+
+    var detailedCount = 0;
+
+    Object.values(state.people).forEach(function (p) {
+      if (!p.vivant) return;
+      p.liens.forEach(function (lien) {
+        if (lien.id !== "self") return;
+
+        // Les liens au-delà du plafond « détaillé » restent en arrière-plan
+        var detailed = detailedCount < (cfg.maxDetailedPeople || 30);
+        if (detailed) detailedCount++;
+
+        // La connaissance progresse avec le temps partagé
+        lien.connaissance = clamp((lien.connaissance || 0) + (detailed ? 4 : 0.5), 0, 100);
+
+        // L'affection suit la connaissance et converge vers un plafond
+        // (plus on est proche, plus la progression est lente).
+        var perRole = growth[lien.role] !== undefined ? growth[lien.role] : 1.2;
+        var depth = (lien.connaissance || 0) / 100;
+        var headroom = 1 - (lien.affection || 0) / 100;
+        var gain = perRole * depth * headroom * 3 * (detailed ? 1 : 0.3);
+        if (lien.contactsParAn > 0) gain += 1.5;
+
+        lien.affection = clamp(lien.affection + gain, 0, 100);
+        lien.confiance = clamp(lien.confiance + gain * 0.6, 0, 100);
+        lien.contactsParAn = 0;
+
+        // Le lien côté joueur (onglet « Proches ») suit le même lien
+        var side = (self.liens || []).find(function (l) { return l.id === p.id; });
+        if (side) {
+          side.affection = lien.affection;
+          side.confiance = lien.confiance;
+          side.connaissance = lien.connaissance;
+          side.dernierContact = state.year;
+        }
+
+        checkRelationThresholds(p, lien, state);
+      });
+    });
+  }
+
   function erodeRelations(state) {
     var cfg = window.VIE.config.relations;
     var currentY = state.year;
@@ -158,24 +207,57 @@
     });
   }
 
+  // ── ÉCHELLE DE STATUTS (§5.1) ─────────────────────────────
+  // Source unique de vérité : les seuils d'affection déterminent le statut.
+  var STATUT_LADDER = {
+    ami: [
+      { key: "connaissance", min: 0 },
+      { key: "copain", min: 20 },
+      { key: "ami", min: 35 },
+      { key: "ami_proche", min: 60 },
+      { key: "meilleur_ami", min: 85 }
+    ],
+    amour: [
+      { key: "crush", min: 0 },
+      { key: "flirt", min: 15 },
+      { key: "aventure", min: 30 },
+      { key: "relation", min: 45 },
+      { key: "couple_installe", min: 65 },
+      { key: "fiances", min: 82 },
+      { key: "marie", min: 92 }
+    ],
+    pro: [
+      { key: "collègue", min: 0 },
+      { key: "confier", min: 60 }
+    ],
+    famille: [
+      { key: "proche", min: 0 }
+    ],
+    enfant: [
+      { key: "proche", min: 0 }
+    ]
+  };
+
+  function statutFromAffection(role, affection) {
+    var ladder = STATUT_LADDER[role] || STATUT_LADDER.ami;
+    var best = ladder[0].key;
+    ladder.forEach(function (s) { if (affection >= s.min) best = s.key; });
+    return best;
+  }
+
   function checkRelationThresholds(person, lien, state) {
     var oldStatut = lien.statut;
     var newStatut = oldStatut;
 
-    // Amitié
-    if (lien.role === "ami") {
-      if (lien.affection >= 80 && lien.statut !== "ami_proche") newStatut = "ami_proche";
-      else if (lien.affection >= 95 && lien.statut !== "meilleur_ami") newStatut = "meilleur_ami";
-      else if (lien.affection < 30 && lien.statut !== "connaissance") newStatut = "connaissance";
-      else if (lien.affection < 15) newStatut = "perdu_de_vue";
-    }
-
-    // Amour
-    if (lien.role === "amour") {
-      if (lien.affection >= 85 && lien.statut === "relation") newStatut = "couple_installe";
-      else if (lien.affection >= 70 && lien.statut === "flirt") newStatut = "relation";
-      else if (lien.affection < 25 && (lien.statut === "relation" || lien.statut === "couple_installe")) newStatut = "crise";
-      else if (lien.affection < 10) newStatut = "rupture";
+    // Amitié et amour : le statut suit l'affection
+    if (lien.role === "ami" || lien.role === "amour") {
+      if (lien.affection >= 15) {
+        newStatut = statutFromAffection(lien.role, lien.affection);
+      } else if (lien.role === "ami") {
+        newStatut = "perdu_de_vue";
+      } else {
+        newStatut = "rupture";
+      }
     }
 
     // Tension
@@ -577,7 +659,7 @@
     // Alcool : augmentation si stress, soirées, traits fêtard/impulsif ; diminution si thérapie, âge, trait travailleur
     var alcoolDelta = 0;
     if (hab.alcool > 0) {
-      alcoolDelta += (hab.alcool / 100) * 0.5; // tolérance naturelle
+      alcoolDelta += (hab.alcool / 100) * 1.2; // tolérance naturelle
       if (state.flags.includes("en_therapie")) alcoolDelta -= 2;
       if (state.personality.C > 60) alcoolDelta -= 1;
       if (state.personality.N > 70) alcoolDelta += 1;
@@ -589,7 +671,7 @@
     // Tabac : très difficile à réduire sans flag non_fumeur
     var tabacDelta = 0;
     if (hab.tabac > 0) {
-      tabacDelta += 0.3; // dépendance physique
+      tabacDelta += 0.8; // dépendance physique
       if (state.flags.includes("non_fumeur")) tabacDelta -= 5;
       if (state.personality.C > 70) tabacDelta -= 1;
       if (state.age > 60) tabacDelta -= 0.5;
@@ -599,7 +681,7 @@
     // Cannabis
     var cannabisDelta = 0;
     if (hab.cannabis > 0) {
-      cannabisDelta += 0.2;
+      cannabisDelta += 0.5;
       if (state.flags.includes("en_therapie")) cannabisDelta -= 1;
       if (state.personality.C > 60) cannabisDelta -= 1;
     }
@@ -661,7 +743,7 @@
     // Soirées : liées à extraversion, alcool, âge
     var soireesDelta = 0;
     if (hab.soirees > 0) {
-      soireesDelta += (hab.soirees / 100) * 0.5;
+      soireesDelta += (hab.soirees / 100) * 1.0;
       if (state.personality.E > 60) soireesDelta += 1;
       if (hab.alcool > 50) soireesDelta += 1;
       if (state.age > 40) soireesDelta -= 1;
@@ -751,6 +833,9 @@
   window.VIE.engine.relations = {
     compatibility: compatibility,
     erodeAll: erodeRelations,
+    updateLinks: updateLinks,
+    statutFromAffection: statutFromAffection,
+    STATUT_LADDER: STATUT_LADDER,
     spontaneousContacts: spontaneousContacts,
     getInteractions: getAvailableInteractions,
     resolveInteraction: resolveInteraction,

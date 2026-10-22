@@ -222,14 +222,25 @@
       if (!p.vivant) return;
       var age = currentY - p.naissance;
 
-      // Mortalité
-      if (shouldDie(p, age, state)) {
+      // Le joueur n'est pas vieilli ici : sa santé et sa mortalité sont
+      // gérées par les stats du joueur (game.js). Le traiter ici appliquait
+      // une seconde rolled mort par an.
+      if (p.id === "self") return;
+
+      // Mortalité — déléguée au module santé (source unique de vérité)
+      if (window.VIE.engine.health && window.VIE.engine.health.shouldDie) {
+        if (window.VIE.engine.health.shouldDie(p, state)) {
+          killPerson(p, state, age);
+          return;
+        }
+      } else if (shouldDie(p, age, state)) {
         killPerson(p, state, age);
         return;
       }
 
-      // Évolution naturelle
-      p.sante = clamp(p.sante + (Math.random() - 0.5) * 3 - age * 0.05, 0, 100);
+      // Évolution naturelle (vieillissement progressif, pas `age * x` par an)
+      var decay = 0.4 + Math.max(0, age - 30) * 0.02;
+      p.sante = clamp(p.sante + (Math.random() - 0.5) * 3 - decay, 0, 100);
       p.apparence = clamp(p.apparence - 0.3 + Math.random() * 0.5, 0, 100);
       p.niveauVie = clamp(p.niveauVie + (Math.random() - 0.5) * 5, 10, 100);
       p.humeur = clamp(p.humeur + (Math.random() - 0.5) * 10, 0, 100);
@@ -240,6 +251,10 @@
   }
 
   function shouldDie(person, age, state) {
+    // Source unique de vérité : le module santé.
+    if (window.VIE.engine.health && window.VIE.engine.health.mortalityProb) {
+      return Math.random() < window.VIE.engine.health.mortalityProb(person, state);
+    }
     var cfg = window.VIE.config.health.gompertz;
     var g = cfg[person.sexe === "femme" ? "femme" : "homme"];
     var baseProb = g.a * Math.exp(g.b * age);

@@ -175,6 +175,19 @@ body {
   background: #fff8e6;
 }
 
+.birth-year-option {
+  text-align: center;
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--ink);
+}
+
+.birth-year-option.selected {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+}
+
 .trait-option strong {
   display: block;
   font-size: 1.05rem;
@@ -401,6 +414,40 @@ body {
   padding: 6px 12px;
 }
 
+.btn-secondary {
+  font-family: inherit;
+  font-size: 0.9rem;
+  border: 1px solid #d8c9a8;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.btn-secondary:hover {
+  border-color: var(--gold);
+  background: #fff8e6;
+}
+
+.btn-warning {
+  font-family: inherit;
+  font-size: 0.9rem;
+  border: 1px solid var(--blood);
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: var(--card);
+  color: var(--blood);
+}
+
+.btn-warning:hover {
+  background: var(--blood);
+  color: #fff;
+}
+
 /* Notification temporaire */
 .toast {
   position: fixed;
@@ -505,6 +552,37 @@ body {
 .fin-line.pos b { color: var(--green); }
 .fin-line.neg b { color: var(--blood); }
 .fin-sub { font-size: 0.78rem; color: var(--ink-soft); margin-top: 4px; }
+
+.statut-block {
+  margin-bottom: 16px;
+}
+
+.statut-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 14px;
+  background: var(--paper);
+  border-radius: 8px;
+  border: 1px solid #e2d5b6;
+  margin-bottom: 8px;
+}
+
+.statut-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  font-weight: bold;
+}
+
+.statut-count {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  background: var(--paper-2);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
 
 .world-event {
   font-size: 0.84rem;
@@ -818,6 +896,577 @@ body {
 .story-card[data-theme="social"] .story-stage { background: #fbead8; color: #c07a2b; }
 .story-card[data-theme="aleatoire"] .story-stage { background: #efefeb; color: #6a6a5c; }
 
+/* ---- Impact des choix (deltas animés) ---- */
+.delta-container {
+  position: relative;
+  height: 48px;
+  overflow: visible;
+  pointer-events: none;
+  margin-top: 8px;
+}
+
+.delta-indicator {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  animation: deltaFloat 0.8s ease-out forwards;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  margin-right: 8px;
+}
+
+.delta-up {
+  background: rgba(60, 110, 71, 0.95);
+  color: #fff;
+  border: 1px solid var(--green);
+}
+
+.delta-down {
+  background: rgba(158, 43, 37, 0.95);
+  color: #fff;
+  border: 1px solid var(--blood);
+}
+
+.delta-fade {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+@keyframes deltaFloat {
+  0% { transform: translateY(0); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-14px); opacity: 1; }
+}
+
+/* ---- Cartes onglets : amélioration UX globale ---- */
+.tabs-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gold-soft);
+  overflow-x: auto;
+}
+
+.tab-btn {
+  background: var(--paper);
+  border: 1px solid #d8c9a8;
+  border-radius: 10px;
+  padding: 10px 18px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  border-color: var(--gold);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.tab-btn.active {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+  box-shadow: var(--shadow);
+}
+
+.modal-content-large {
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.housing-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.housing-option {
+  background: var(--card);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.housing-option:hover {
+  border-color: var(--gold);
+  background: #fff8e6;
+}
+
+.housing-option.current {
+  border-color: var(--green);
+  background: #e3efe6;
+}
+
+.housing-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.invest-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.invest-option-card {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.invest-option-card h4 {
+  font-size: 1rem;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+
+.invest-option-card p {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 4px 0;
+}
+
+/* Cartes onglets : amélioration UX globale */
+
+/* Finances */
+.finance-header {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.fin-kpi {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: center;
+}
+
+.fin-kpi .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--ink-soft); display: block; margin-bottom: 4px; }
+.fin-kpi .value { font-size: 1.3rem; font-weight: bold; color: var(--ink); display: block; }
+.fin-kpi .value.pos { color: var(--green); }
+.fin-kpi .value.neg { color: var(--blood); }
+
+.fin-section {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.fin-section h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e2d5b6;
+  padding-bottom: 6px;
+}
+
+.budget-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.budget-col h5 {
+  font-size: 0.85rem;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.budget-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  padding: 3px 0;
+}
+
+.budget-line.total {
+  font-weight: bold;
+  color: var(--ink);
+  border-top: 1px dashed #d8c9a8;
+  margin-top: 6px;
+  padding-top: 6px;
+}
+
+.invest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.invest-card {
+  background: var(--paper);
+  border: 1px solid #e2d5b6;
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.invest-card .inv-label { display: block; font-size: 0.75rem; color: var(--ink-soft); margin-bottom: 4px; }
+.invest-card .inv-value { display: block; font-size: 1.1rem; font-weight: bold; color: var(--ink); }
+
+.debt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.debt-table th {
+  text-align: left;
+  padding: 6px;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.debt-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #e2d5b6;
+  color: var(--ink);
+}
+
+.chart-container {
+  width: 100%;
+  height: 200px;
+  margin-top: 8px;
+}
+
+/* Carrière */
+.career-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.career-header h3 { margin: 0; font-size: 1.4rem; color: var(--ink); }
+.career-track { font-size: 0.85rem; color: var(--ink-soft); background: var(--paper); padding: 4px 12px; border-radius: 999px; border: 1px solid #d8c9a8; }
+.career-satisfaction { font-size: 0.88rem; color: var(--ink-soft); margin-top: 6px; }
+.career-satisfaction .bar { height: 6px; background: var(--paper-2); border-radius: 999px; overflow: hidden; margin-top: 4px; width: 140px; }
+.career-satisfaction .bar-fill { height: 100%; border-radius: 999px; background: var(--green); }
+
+.career-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.career-card {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.career-card h4 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.career-card p { font-size: 0.9rem; color: var(--ink); margin: 3px 0; }
+.career-salary { color: var(--green); font-weight: bold; font-size: 1rem; }
+
+.next { font-size: 0.82rem; color: var(--gold); margin-top: 6px; }
+
+.career-section {
+  margin-bottom: 14px;
+}
+
+.career-section h4 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.skill {
+  font-size: 0.85rem;
+}
+
+.skill span:first-child { color: var(--ink); }
+.skill .bar { height: 5px; background: var(--paper-2); border-radius: 999px; overflow: hidden; margin-top: 3px; }
+.skill .bar-fill { height: 100%; border-radius: 999px; background: var(--gold-soft); }
+
+.career-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.person-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--paper);
+  border: 1px solid #d8c9a8;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.person-mini .avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-soft));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 0.85rem; font-weight: bold;
+}
+
+.person-mini .name { font-weight: bold; color: var(--ink); }
+.person-mini .role { font-size: 0.75rem; color: var(--ink-soft); margin-left: 4px; }
+.person-mini .affection { margin-left: auto; font-size: 0.8rem; font-weight: bold; color: var(--green); }
+
+/* Moi / Stats */
+.happiness-breakdown {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.happiness-item {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.h-label { font-size: 0.72rem; color: var(--ink-soft); display: block; margin-bottom: 6px; }
+.h-bar { height: 6px; background: var(--paper-2); border-radius: 999px; overflow: hidden; margin-bottom: 4px; }
+.h-bar .bar-fill { height: 100%; border-radius: 999px; background: var(--gold-soft); }
+.h-val { font-size: 0.8rem; font-weight: bold; color: var(--ink); }
+
+.personality-radar { margin-bottom: 14px; }
+
+.trait-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 0.9rem;
+}
+
+.trait-row span:first-child {
+  width: 110px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.trait-row .bar { height: 6px; background: var(--paper-2); border-radius: 999px; overflow: hidden; flex: 1; }
+.trait-row .bar-fill { height: 100%; border-radius: 999px; background: var(--gold-soft); }
+
+.lucidity {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-top: 10px;
+  text-align: center;
+}
+
+.personality-traits {
+  margin-top: 12px;
+}
+
+.traits-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.habits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.habit {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.habit.high { border-color: var(--gold-soft); }
+.habit.addiction { border-color: var(--blood); }
+
+.h-label { font-size: 0.75rem; color: var(--ink-soft); display: block; margin-bottom: 6px; }
+.h-bar { height: 6px; background: var(--paper-2); border-radius: 999px; overflow: hidden; margin-bottom: 4px; }
+.h-bar .bar-fill { height: 100%; border-radius: 999px; }
+.h-val { font-size: 0.8rem; font-weight: bold; color: var(--ink); }
+
+.habit.addiction .bar-fill { background: var(--blood); }
+
+.health-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.health-card {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.health-card h5 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.health-card p {
+  font-size: 0.9rem;
+  color: var(--ink);
+  margin: 4px 0;
+}
+
+/* Proches */
+.people-group {
+  margin-bottom: 16px;
+}
+
+.people-group h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2d5b6;
+}
+
+.people-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid #d8c9a8;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.person-row:hover {
+  border-color: var(--gold);
+  transform: translateX(3px);
+}
+
+.person-row.alert {
+  border-color: var(--blood);
+}
+
+.person-row.low-mood {
+  border-color: #d8c9a8;
+}
+
+.person-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-soft));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; font-weight: bold;
+}
+
+.person-info { flex: 1; }
+
+.person-name { font-weight: bold; color: var(--ink); font-size: 1rem; }
+
+.person-meta {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+.person-bars {
+  margin-top: 6px;
+}
+
+.person-bars .bar {
+  height: 5px;
+  background: var(--paper-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 3px 0;
+  width: 100%;
+}
+
+.person-bars .bar-fill { height: 100%; border-radius: 999px; }
+
+.person-bars .bar-fill.affection { background: var(--green); }
+.person-bars .bar-fill.attraction { background: #b3547a; }
+.person-bars .bar-fill.tension { background: var(--blood); }
+
+.person-traits {
+  margin-top: 6px;
+}
+
+.trait-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  margin: 2px 2px 0 0;
+}
+
+.empty {
+  text-align: center;
+  color: var(--ink-soft);
+  font-style: italic;
+  padding: 20px;
+}
+
+.mini-radar { margin: 12px 0; }
+
+
 /* ---- Transition d'année ---- */
 .year-fade {
   position: fixed;
@@ -979,4 +1628,635 @@ body {
   font-size: 1.1rem;
   color: var(--ink);
   line-height: 1.6;
+}
+
+/* ============================================================
+   IMPACT DES CHOIX (deltas après chaque décision)
+   ============================================================ */
+.impact-panel {
+  position: relative;
+  height: 56px;
+  overflow: visible;
+  pointer-events: none;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.impact-header {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.impact-header h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink-soft);
+}
+
+.impact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  animation: deltaFloat 0.8s ease-out forwards;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  margin-right: 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.impact-up {
+  background: rgba(60, 110, 71, 0.95);
+  color: #fff;
+  border-color: var(--green);
+}
+
+.impact-down {
+  background: rgba(158, 43, 37, 0.95);
+  color: #fff;
+  border-color: var(--blood);
+}
+
+.impact-neutral {
+  background: rgba(184, 134, 11, 0.9);
+  color: #fff;
+  border-color: var(--gold);
+}
+
+.impact-icon {
+  font-size: 1.1rem;
+  margin-right: 4px;
+}
+
+.impact-label {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.impact-value {
+  font-size: 1rem;
+  margin-left: 4px;
+}
+
+.impact-show {
+  animation: impactPanelIn 0.4s ease forwards;
+}
+
+@keyframes deltaFloat {
+  0% { transform: translateY(0); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-14px); opacity: 1; }
+}
+
+@keyframes impactPanelIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   ÉVÉNEMENTS PASSIFS (interludes)
+   ============================================================ */
+.event-passive {
+  border-left-color: var(--blue) !important;
+}
+
+.passive-badge {
+  position: absolute;
+  top: -10px;
+  left: 20px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: var(--shadow);
+}
+
+/* ============================================================
+   VŒUX DE FIN D'ANNÉE (overlay)
+   ============================================================ */
+.wish-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(58, 46, 36, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.wish-card {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 90%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: wishPop 0.5s ease both;
+}
+
+.wish-header {
+  padding: 24px 24px 16px;
+  text-align: center;
+  border-bottom: 1px solid #e2d5b6;
+}
+
+.wish-header h2 {
+  margin: 0 0 8px;
+  font-size: 1.6rem;
+  color: var(--ink);
+}
+
+.wish-header p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.wish-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+}
+
+.wish-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--paper);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.wish-option:hover {
+  border-color: var(--gold);
+  background: #fff8e6;
+  transform: translateX(4px);
+}
+
+.wish-icon {
+  font-size: 2rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--paper-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.wish-info .wish-title {
+  font-weight: bold;
+  color: var(--ink);
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+}
+
+.wish-info .wish-desc {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.wish-footer {
+  padding: 16px 24px 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #e2d5b6;
+}
+
+@keyframes wishPop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ============================================================
+   ONGLET "MOI" : FICHE PERSONNELLE
+   ============================================================ */
+.identity-card {
+  background: linear-gradient(135deg, var(--card), #f0e6d2);
+  border: 2px solid var(--gold-soft);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+
+.identity-card h4 {
+  margin-top: 0;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  border-bottom: 2px solid var(--gold-soft);
+  padding-bottom: 8px;
+}
+
+.identity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.id-item {
+  background: rgba(255,255,255,0.6);
+  border: 1px solid #e2d5b6;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.id-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-soft);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.id-value {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--ink);
+}
+
+.id-value.destiny {
+  color: var(--blood);
+}
+
+/* Carrière dans onglet Moi */
+.career-summary {
+  background: var(--paper);
+  border: 1px solid #e2d5b6;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.career-role {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.career-track {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+.career-satisfaction {
+  font-size: 0.85rem;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.career-satisfaction .bar {
+  height: 6px;
+  background: var(--paper-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 4px;
+  width: 140px;
+}
+
+.career-satisfaction .bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+.career-money {
+  font-size: 0.85rem;
+  color: var(--green);
+  font-weight: bold;
+  margin-top: 6px;
+}
+
+.diplome {
+  font-size: 0.9rem;
+  color: var(--ink);
+  margin-top: 8px;
+}
+
+.skills {
+  margin-top: 10px;
+}
+
+.skill {
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.skill span:first-child {
+  width: 120px;
+  display: inline-block;
+  color: var(--ink);
+}
+
+.skill .bar {
+  height: 5px;
+  background: var(--paper-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 3px;
+  flex: 1;
+}
+
+.skill .bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gold-soft);
+}
+
+/* Finances dans onglet Moi */
+.fin-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.fin-kpi {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: center;
+}
+
+.fin-kpi .label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink-soft);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.fin-kpi .value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--ink);
+  display: block;
+}
+
+.fin-kpi .value.pos { color: var(--green); }
+.fin-kpi .value.neg { color: var(--blood); }
+
+.det-warning {
+  color: var(--blood);
+  font-weight: bold;
+  font-size: 0.85rem;
+  margin: 8px 0;
+}
+
+.inv-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.inv-chip {
+  background: var(--paper);
+  border: 1px solid #e2d5b6;
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+/* Relations dans onglet Moi */
+.rel-summary {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.rel-chip {
+  background: var(--paper);
+  border: 1px solid #e2d5b6;
+  border-radius: 20px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  font-weight: bold;
+}
+
+.rel-count {
+  color: var(--gold);
+  margin-right: 6px;
+}
+
+.top-relations {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.top-relation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--paper);
+  border: 1px solid #d8c9a8;
+  border-radius: 10px;
+  padding: 10px 14px;
+  flex: 1;
+}
+
+.rel-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), var(--gold-soft));
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; font-weight: bold;
+}
+
+.rel-name {
+  font-weight: bold; color: var(--ink); flex: 1;
+}
+
+.rel-affection {
+  font-size: 0.8rem; font-weight: bold; color: var(--green);
+}
+
+/* Passions */
+.passions-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.passion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.passion-chip.high { border: 1px solid var(--green); }
+.passion-chip.mid { border: 1px solid var(--gold-soft); }
+.passion-chip.low { border: 1px solid #d8c9a8; }
+
+.passion-lvl {
+  font-size: 0.7rem;
+  font-weight: bold;
+  opacity: 0.8;
+}
+
+/* Santé détaillée */
+.health-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.health-card {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.health-card h5 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.health-card p {
+  font-size: 0.9rem;
+  color: var(--ink);
+  margin: 4px 0;
+}
+
+.stat-val {
+  font-weight: bold;
+}
+
+.stat-val.good { color: var(--green); }
+.stat-val.mid { color: var(--gold-soft); }
+.stat-val.low { color: var(--blood); }
+
+/* Habitudes */
+.habits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.habit {
+  background: var(--card);
+  border: 1px solid #e2d5b6;
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.habit.high { border-color: var(--gold-soft); }
+.habit.addiction { border-color: var(--blood); }
+
+.h-label {
+  font-size: 0.75rem; color: var(--ink-soft); display: block; margin-bottom: 6px;
+}
+.h-bar {
+  height: 6px; background: var(--paper-2); border-radius: 999px; overflow: hidden; margin-bottom: 4px;
+}
+.h-bar .bar-fill { height: 100%; border-radius: 999px; }
+.h-val {
+  font-size: 0.8rem; font-weight: bold; color: var(--ink);
+}
+.habit.addiction .bar-fill { background: var(--blood); }
+
+/* Personnalité */
+.personality-radar { margin-bottom: 14px; }
+
+.trait-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 0.9rem;
+}
+
+.trait-row span:first-child {
+  width: 110px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.trait-row .bar {
+  height: 6px; background: var(--paper-2); border-radius: 999px; overflow: hidden; flex: 1;
+}
+.trait-row .bar-fill { height: 100%; border-radius: 999px; background: var(--gold-soft); }
+
+.lucidity {
+  font-size: 0.8rem; color: var(--ink-soft); margin-top: 10px; text-align: center;
+}
+
+.personality-traits { margin-top: 12px; }
+.traits-cloud {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;
+}
+.trait-tag {
+  display: inline-block; font-size: 0.68rem; padding: 2px 7px;
+  border-radius: 999px; background: var(--paper-2); color: var(--ink-soft); margin: 2px;
+}
+
+/* Vœux */
+.wish-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--paper);
+  border: 1px solid #d8c9a8;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.wish-icon { font-size: 1.5rem; flex-shrink: 0; }
+.wish-info { flex: 1; }
+.wish-title { font-weight: bold; color: var(--ink); display: block; margin-bottom: 2px; }
+.wish-dur { font-size: 0.8rem; color: var(--ink-soft); }
+
+/* Vide */
+.empty {
+  text-align: center;
+  color: var(--ink-soft);
+  font-style: italic;
+  padding: 20px;
 }
