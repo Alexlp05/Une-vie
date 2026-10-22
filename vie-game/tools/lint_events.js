@@ -7,6 +7,8 @@
 const fs = require("fs");
 const path = require("path");
 
+global.window = global.window || {};
+
 const EVENTS_DIR = path.join(__dirname, "..", "data");
 const CONFIG = require("../data/config_events.js"); // sera dispo si on charge via node avec VM
 

@@ -32,6 +32,7 @@
   var _showingImpact = false;
   var _passiveBefore = null; // snapshot avant un événement passif
   var _wishesPhase = false; // true pendant l'écran de vœux de fin d'année
+  var _impactTimer = null;
 
   function $(sel) { return document.querySelector(sel); }
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -110,54 +111,75 @@
   function initTitle() {
     var btnStart = $("#btn-start");
     var btnReplay = $("#btn-replay");
-    if (btnStart) btnStart.addEventListener("click", function () { showAuth(); });
-    if (btnReplay) btnReplay.addEventListener("click", function () { showAuth(); });
+    function onStart() {
+      if (window.VIE && window.VIE.supabase && window.VIE.supabase.isConfigured && window.VIE.supabase.isConfigured() && !window.VIE.supabase.isLoggedIn()) {
+        showAuth();
+      } else {
+        showCreation();
+      }
+    }
+    if (btnStart) btnStart.addEventListener("click", onStart);
+    if (btnReplay) btnReplay.addEventListener("click", onStart);
   }
 
   function showAuth() {
     show("screen-auth");
-    window.VIE.supabase.init();
+    if (window.VIE && window.VIE.supabase && window.VIE.supabase.init) {
+      window.VIE.supabase.init();
+    }
     var form = document.getElementById("auth-form");
     var submit = document.getElementById("btn-auth-submit");
     var errorEl = document.getElementById("auth-error");
     var modeLogin = document.getElementById("btn-mode-login");
     var modeSignup = document.getElementById("btn-mode-signup");
+    var btnGuest = document.getElementById("btn-guest-mode");
     var isSignup = false;
 
-    modeLogin.addEventListener("click", function() {
-      isSignup = false;
-      modeLogin.classList.add("btn-primary");
-      modeLogin.classList.remove("btn-secondary");
-      modeSignup.classList.add("btn-secondary");
-      modeSignup.classList.remove("btn-primary");
-      submit.textContent = "Se connecter";
-    });
-
-    modeSignup.addEventListener("click", function() {
-      isSignup = true;
-      modeSignup.classList.add("btn-primary");
-      modeSignup.classList.remove("btn-secondary");
-      modeLogin.classList.add("btn-secondary");
-      modeLogin.classList.remove("btn-primary");
-      submit.textContent = "Créer mon compte";
-    });
-
-    form.onsubmit = async function(e) {
-      e.preventDefault();
-      var username = document.getElementById("auth-username").value.trim();
-      var password = document.getElementById("auth-password").value.trim();
-      errorEl.textContent = "";
-      try {
-        if (isSignup) {
-          await window.VIE.supabase.signup(username, password);
-        } else {
-          await window.VIE.supabase.login(username, password);
-        }
+    if (btnGuest) {
+      btnGuest.onclick = function() {
         showCreation();
-      } catch (err) {
-        errorEl.textContent = err.message || "Erreur inconnue";
-      }
-    };
+      };
+    }
+
+    if (modeLogin && modeSignup && submit) {
+      modeLogin.onclick = function() {
+        isSignup = false;
+        modeLogin.classList.add("btn-primary");
+        modeLogin.classList.remove("btn-secondary");
+        modeSignup.classList.add("btn-secondary");
+        modeSignup.classList.remove("btn-primary");
+        submit.textContent = "Se connecter";
+      };
+
+      modeSignup.onclick = function() {
+        isSignup = true;
+        modeSignup.classList.add("btn-primary");
+        modeSignup.classList.remove("btn-secondary");
+        modeLogin.classList.add("btn-secondary");
+        modeLogin.classList.remove("btn-primary");
+        submit.textContent = "Créer mon compte";
+      };
+    }
+
+    if (form) {
+      form.onsubmit = async function(e) {
+        e.preventDefault();
+        var username = document.getElementById("auth-username").value.trim();
+        var password = document.getElementById("auth-password").value.trim();
+        if (errorEl) errorEl.textContent = "";
+        try {
+          if (!window.VIE.supabase) throw new Error("Module Supabase non disponible");
+          if (isSignup) {
+            await window.VIE.supabase.signup(username, password);
+          } else {
+            await window.VIE.supabase.login(username, password);
+          }
+          showCreation();
+        } catch (err) {
+          if (errorEl) errorEl.textContent = err.message || "Erreur inconnue";
+        }
+      };
+    }
   }
 
   function showCreation() {
