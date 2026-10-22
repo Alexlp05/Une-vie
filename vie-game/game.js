@@ -16,6 +16,8 @@
   var _lastEventWasPassive = false;
   var gameOver = false;
   var gameOverReason = null;
+  var currentAccount = null;
+  var useCloud = false;
 
   var STAT_KEYS = ["sante", "energie", "argent", "intelligence", "social", "bonheur", "stress", "apparence", "reputation", "confiance"];
   var STAT_LABELS = {
@@ -108,8 +110,54 @@
   function initTitle() {
     var btnStart = $("#btn-start");
     var btnReplay = $("#btn-replay");
-    if (btnStart) btnStart.addEventListener("click", function () { showCreation(); });
-    if (btnReplay) btnReplay.addEventListener("click", function () { showCreation(); });
+    if (btnStart) btnStart.addEventListener("click", function () { showAuth(); });
+    if (btnReplay) btnReplay.addEventListener("click", function () { showAuth(); });
+  }
+
+  function showAuth() {
+    show("screen-auth");
+    window.VIE.supabase.init();
+    var form = document.getElementById("auth-form");
+    var submit = document.getElementById("btn-auth-submit");
+    var errorEl = document.getElementById("auth-error");
+    var modeLogin = document.getElementById("btn-mode-login");
+    var modeSignup = document.getElementById("btn-mode-signup");
+    var isSignup = false;
+
+    modeLogin.addEventListener("click", function() {
+      isSignup = false;
+      modeLogin.classList.add("btn-primary");
+      modeLogin.classList.remove("btn-secondary");
+      modeSignup.classList.add("btn-secondary");
+      modeSignup.classList.remove("btn-primary");
+      submit.textContent = "Se connecter";
+    });
+
+    modeSignup.addEventListener("click", function() {
+      isSignup = true;
+      modeSignup.classList.add("btn-primary");
+      modeSignup.classList.remove("btn-secondary");
+      modeLogin.classList.add("btn-secondary");
+      modeLogin.classList.remove("btn-primary");
+      submit.textContent = "Créer mon compte";
+    });
+
+    form.onsubmit = async function(e) {
+      e.preventDefault();
+      var username = document.getElementById("auth-username").value.trim();
+      var password = document.getElementById("auth-password").value.trim();
+      errorEl.textContent = "";
+      try {
+        if (isSignup) {
+          await window.VIE.supabase.signup(username, password);
+        } else {
+          await window.VIE.supabase.login(username, password);
+        }
+        showCreation();
+      } catch (err) {
+        errorEl.textContent = err.message || "Erreur inconnue";
+      }
+    };
   }
 
   function showCreation() {
@@ -251,11 +299,11 @@
 
   function initCreation() {
     var btnCreate = $("#btn-create");
-    if (btnCreate) btnCreate.addEventListener("click", function () {
+    if (btnCreate) btnCreate.addEventListener("click", async function () {
       try {
         var name = $("#input-name").value.trim();
         if (!name || !selectedTrait || !selectedOrigin || !selectedSexe || selectedBirthYear === null) return;
-        startGame(name, selectedTrait, selectedOrigin, selectedSexe, selectedBirthYear);
+        await startGame(name, selectedTrait, selectedOrigin, selectedSexe, selectedBirthYear);
       } catch (e) {
         console.error("Erreur startGame:", e);
         alert("Erreur lors du démarrage de la partie : " + e.message);
@@ -266,7 +314,7 @@
   }
 
   /* ---------- Nouvelle partie ---------- */
-  function startGame(name, trait, origin, sexe, birthYear) {
+  async function startGame(name, trait, origin, sexe, birthYear) {
     var engine = window.VIE.engine;
     var base = engine.state ? engine.state.create() : {};
     var seed = Math.floor(Math.random() * 0x100000000);
@@ -291,6 +339,25 @@
     state.rngSeed = seed;
     state.birthYear = birthYear || state.year;
     state.year = state.birthYear;
+
+    // Charger depuis le cloud si connecté
+    if (window.VIE.supabase && window.VIE.supabase.isLoggedIn()) {
+      try {
+        var cloud = await window.VIE.supabase.loadGame();
+        if (cloud.ok && cloud.state) {
+          state = cloud.state;
+          // Garder les nouvelles infos de création
+          state.name = name;
+          state.sexe = sexe;
+          state.trait = trait;
+          state.archetypeBias = trait.bias || {};
+        }
+      } catch (e) {
+        console.warn("Impossible de charger la sauvegarde cloud:", e);
+      }
+    }
+
+    if (engine.state && engine.state.set) engine.state.set(state);
     state.world = engine.world ? engine.world.create() : worldStart();
     state.stats = state.stats || { sante: 85, energie: 80, argent: 42, intelligence: 20, social: 20, bonheur: 60, stress: 10, apparence: 50, reputation: 50, confiance: 50 };
     state.habitudes = state.habitudes || { alcool: 0, tabac: 0, cannabis: 0, jeu: 0, sport: 0, alimentation: 50, sommeil: 50, ecrans: 0, soirees: 0, voyages: 0 };
@@ -1015,6 +1082,13 @@
     // Sauvegarde automatique (en fin d'année, une fois tout à jour)
     if (window.VIE.engine.save && window.VIE.engine.save.save) {
       try { window.VIE.engine.save.save("auto"); } catch (e) { /* sauvegarde non bloquante */ }
+    }
+
+    // Sauvegarde cloud si connecté
+    if (window.VIE.supabase && window.VIE.supabase.isLoggedIn()) {
+      window.VIE.supabase.saveGame(state).catch(function(e) {
+        console.warn("Sauvegarde cloud échouée:", e);
+      });
     }
 
     // Vœux de fin d'année (à partir de 18 ans)

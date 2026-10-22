@@ -116,6 +116,35 @@
 
     </section>
 
+    <!-- Écran de connexion Supabase -->
+    <section id="screen-auth" class="screen hidden">
+      <div class="title-card">
+        <h1 class="title-main">Se connecter</h1>
+        <p class="title-sub">Crée ton compte ou connecte-toi pour sauvegarder dans le cloud</p>
+        
+        <div id="auth-mode-toggle" style="margin-bottom:20px; text-align:center;">
+          <button id="btn-mode-login" class="btn btn-primary">Connexion</button>
+          <button id="btn-mode-signup" class="btn btn-secondary">Créer un compte</button>
+        </div>
+
+        <form id="auth-form" style="display:flex; flex-direction:column; gap:12px; max-width:340px; margin:0 auto;">
+          <div>
+            <label class="field-label" for="auth-username">Nom d'utilisateur</label>
+            <input id="auth-username" type="text" placeholder="ex: alex" required>
+          </div>
+          <div>
+            <label class="field-label" for="auth-password">Mot de passe</label>
+            <input id="auth-password" type="password" placeholder="••••••••" required>
+          </div>
+          <button id="btn-auth-submit" class="btn btn-primary" style="width:100%;">Se connecter</button>
+        </form>
+        <p id="auth-error" style="color:var(--blood); font-size:0.85rem; text-align:center; margin-top:10px;"></p>
+        <p style="margin-top:15px; font-size:0.8rem; color:var(--ink-soft);">
+          Pas encore de compte ? Crée-en un, c'est gratuit.
+        </p>
+      </div>
+    </section>
+
     <!-- Écran de fin -->
     <section id="screen-end" class="screen hidden">
       <div class="end-card">
@@ -186,6 +215,9 @@
   <script src="ui/careerView.js"></script>
   <script src="ui/statsView.js"></script>
   <script src="ui/render.js"></script>
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="ui/supabase.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

@@ -1852,6 +1852,70 @@ body {
 }
 
 /* ============================================================
+   ÉCRAN DE CONNEXION SUPABASE
+   ============================================================ */
+#screen-auth .title-card {
+  max-width: 400px;
+  margin: 60px auto;
+  padding: 40px 30px;
+}
+
+#auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#auth-form label.field-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+
+#auth-form input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 1rem;
+  border: 1px solid #d8c9a8;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+#btn-auth-submit {
+  width: 100%;
+  margin-top: 8px;
+}
+
+#auth-error {
+  font-size: 0.8rem;
+  color: var(--blood);
+  margin-top: 8px;
+}
+
+.btn-secondary {
+  font-family: inherit;
+  font-size: 0.9rem;
+  border: 1px solid #d8c9a8;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  background: var(--card);
+  color: var(--ink);
+}
+
+.btn-secondary:hover {
+  border-color: var(--gold);
+  background: #fff8e6;
+}
+
+.btn-secondary.active {
+  background: var(--gold);
+  color: #fff;
+  border-color: var(--gold);
+}
+
+/* ============================================================
    ONGLET "MOI" : FICHE PERSONNELLE
    ============================================================ */
 .identity-card {
