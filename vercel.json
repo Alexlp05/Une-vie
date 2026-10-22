@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/vie-game/:path*", "destination": "/vie-game/:path*" },
+    { "source": "/:path*", "destination": "/vie-game/:path*" }
+  ]
+}
