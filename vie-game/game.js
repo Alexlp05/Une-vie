@@ -598,21 +598,32 @@
     if (!card) return;
     var html = "<h4>Famille</h4>";
     if (state.origin) {
-      html += '<p class="fam-origin">' + (state.origin.name || "") + "</p>";
-      if (state.origin.tagline) html += '<p class="fam-tagline">' + state.origin.tagline + "</p>";
+      html += '<p class="fam-origin">' + (state.origin.name || "") + (state.surname ? ' · Famille ' + state.surname : '') + '</p>';
+      if (state.origin.tagline) html += '<p class="fam-tagline">' + state.origin.tagline + '</p>';
     }
-    if (state.surname) html += '<p class="fam-tagline">Nom : ' + state.surname + "</p>";
-    var people = Object.values(state.people || {});
+
+    var people = Object.values(state.people || {}).filter(function (p) { return p.id !== "self" && p.vivant; });
     var parents = people.filter(function (p) { return p.famille.some(function (f) { return f.relation === "enfant" && f.id === "self"; }); });
-    parents.forEach(function (p) {
-      var lien = (p.liens || []).find(function (l) { return l.id === "self"; }) || {};
-      html += '<div class="fam-item"><span class="rel-name">' + p.prenom + '</span> <span class="rel-status">(' + (lien.relation || "parent") + " · " + (lien.affection || 0) + "%)</span></div>";
-    });
     var sibs = people.filter(function (p) { return p.famille.some(function (f) { return f.relation === "frere" || f.relation === "soeur"; }); });
-    sibs.forEach(function (s) {
-      var lien = (s.liens || []).find(function (l) { return l.id === "self"; }) || {};
-      html += '<div class="fam-item"><span class="rel-name">' + s.prenom + '</span> <span class="rel-status">(frère/sœur · ' + (lien.affection || 0) + "%)</span></div>";
-    });
+
+    if (parents.length) {
+      var pDetails = parents.map(function (p) {
+        var lien = (p.liens || []).find(function (l) { return l.id === "self"; }) || {};
+        var aff = Math.round(lien.affection || 0);
+        return '<strong>' + p.prenom + '</strong> <small>(' + (lien.relation || "parent") + ' · ' + aff + '%)</small>';
+      }).join(' · ');
+      html += '<div class="fam-item"><span class="fam-label">Parents :</span> ' + pDetails + '</div>';
+    }
+
+    if (sibs.length) {
+      var sDetails = sibs.map(function (s) {
+        var lien = (s.liens || []).find(function (l) { return l.id === "self"; }) || {};
+        var aff = Math.round(lien.affection || 0);
+        return '<strong>' + s.prenom + '</strong> <small>(' + aff + '%)</small>';
+      }).join(' · ');
+      html += '<div class="fam-item"><span class="fam-label">Fratrie (' + sibs.length + ') :</span> ' + sDetails + '</div>';
+    }
+
     if (!parents.length && !sibs.length) html += '<p class="info-empty">Seul(e) pour l\'instant.</p>';
     card.innerHTML = html;
   }
@@ -642,10 +653,21 @@
     if (!window.VIE.engine.finance) { card.innerHTML = '<h4>Finances</h4><p class="info-empty">—</p>'; return; }
     var f = window.VIE.engine.finance.computeAnnualBalance(state);
     var html = "<h4>Finances</h4>";
-    html += '<p class="fin-line"><span>Épargne</span><b>' + window.VIE.util.formatMoney(state.finance.compte || 0) + "</b></p>";
-    html += '<p class="fin-line"><span>Revenus/an</span><b>~' + window.VIE.util.formatMoney(f.income.total) + "</b></p>";
-    html += '<p class="fin-line"><span>Charges/an</span><b>~' + window.VIE.util.formatMoney(f.expenses) + "</b></p>";
-    html += '<p class="fin-line ' + (f.balance >= 0 ? "pos" : "neg") + '"><span>Solde</span><b>' + (f.balance >= 0 ? "+" : "") + window.VIE.util.formatMoney(f.balance) + "</b></p>";
+    var epargne = Math.max(0, state.finance.compte || 0);
+
+    if (state.age < 16) {
+      html += '<p class="fin-line"><span>Statut</span><b>Mineur (à charge)</b></p>';
+      html += '<p class="fin-line"><span>Tirelire</span><b>' + window.VIE.util.formatMoney(epargne) + "</b></p>";
+      html += '<p class="fin-line"><span>Frais de vie</span><b>Pris en charge</b></p>';
+      if (state.age >= 12 && f.income.total > 0) {
+        html += '<p class="fin-line pos"><span>Argent de poche</span><b>+' + window.VIE.util.formatMoney(f.income.total) + "/an</b></p>";
+      }
+    } else {
+      html += '<p class="fin-line"><span>Épargne</span><b>' + window.VIE.util.formatMoney(state.finance.compte || 0) + "</b></p>";
+      html += '<p class="fin-line"><span>Revenus/an</span><b>~' + window.VIE.util.formatMoney(f.income.total) + "</b></p>";
+      html += '<p class="fin-line"><span>Charges/an</span><b>~' + window.VIE.util.formatMoney(f.expenses) + "</b></p>";
+      html += '<p class="fin-line ' + (f.balance >= 0 ? "pos" : "neg") + '"><span>Solde</span><b>' + (f.balance >= 0 ? "+" : "") + window.VIE.util.formatMoney(f.balance) + "</b></p>";
+    }
     card.innerHTML = html;
   }
 

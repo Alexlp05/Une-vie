@@ -338,7 +338,35 @@ body {
 /* ---- Panneau famille ---- */
 .fam-origin { font-weight: bold; color: var(--ink); font-size: 0.95rem; }
 .fam-tagline { font-size: 0.78rem; font-style: italic; color: var(--gold); margin-bottom: 6px; }
+.fam-item {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.fam-label {
+  font-weight: 600;
+  color: var(--ink);
+}
 .fam-item .rel-name { color: var(--ink); }
+
+.passion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.86rem;
+  padding: 3px 0;
+  color: var(--ink);
+}
+.passion-level {
+  font-size: 0.78rem;
+  font-weight: bold;
+  background: var(--paper);
+  border: 1px solid #e2d5b6;
+  border-radius: 999px;
+  padding: 1px 8px;
+  color: var(--gold);
+}
 
 .end-family {
   font-size: 0.85rem;

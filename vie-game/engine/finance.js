@@ -144,10 +144,10 @@
       var lastSalary = state.narrativeMemory?.lastSalary || 25000;
       total += Math.min(cfg.chomage.plafond, Math.max(cfg.chomage.plancher, lastSalary * cfg.chomage.taux)) * 12;
     }
-    // Soutien familial : un mineur (_ou_ un adulte encore chez ses parents) reçoit de l'argent de poche
+    // Soutien familial : argent de poche uniquement à partir de 12 ans
     var livingWithParents = state.finance.residence && state.finance.residence.type === "parents";
-    if (state.age < 18 && livingWithParents) {
-      total += (cfg.familySupportPerMonth || 0) * 12;
+    if (state.age >= 12 && state.age < 18 && livingWithParents) {
+      total += 20 * 12; // 240 € / an d'argent de poche
     }
     return Math.round(total);
   }
@@ -172,6 +172,11 @@
   // ── CALCUL DÉPENSES ANNUELLES ────────────────────────────
   function computeAnnualExpenses(state) {
     var cfg = window.VIE.config.finance;
+
+    // Pour un enfant de moins de 16 ans, tous les frais (logement, nourriture, santé)
+    // sont intégralement couverts par la famille : 0 € de charges personnelles !
+    if (state.age < 16) return 0;
+
     var expenses = 0;
 
     // 1. Logement
@@ -237,6 +242,7 @@
   }
 
   function computeHabitsCost(state) {
+    if (state.age < 16) return 0; // Un enfant n'a pas de frais d'habitudes payantes
     var h = state.habitudes || {};
     var cost = 0;
     cost += h.alcool * 50;        // 0-100 -> 0-5000€/an
@@ -267,6 +273,10 @@
   function applyAnnualFinances(state) {
     var bal = computeAnnualBalance(state);
     state.finance.compte += bal.balance;
+    // Un enfant ou mineur ne peut pas être à découvert : plancher à 0 €
+    if (state.age < 16 && state.finance.compte < 0) {
+      state.finance.compte = 0;
+    }
     state.finance.historiquePatrimoine.push({ annee: state.year, net: getNetWorth(state) });
     // Mise à jour capital restant dû immobilier
     updateMortgagePrincipal(state);
