@@ -71,7 +71,12 @@
       password: password,
       options: { data: { username: username } }
     });
-    if (error) throw error;
+    if (error) {
+      if (error.message && (error.message.includes("rate limit") || error.message.includes("over_email_send_rate_limit"))) {
+        throw new Error("Limite d'envoi d'emails Supabase atteinte. Pour supprimer cette limite, désactive 'Confirm email' dans ton dashboard Supabase (Authentication > Providers > Email). En attendant, tu peux cliquer sur 'Jouer sans compte' !");
+      }
+      throw error;
+    }
     if (data && data.user) {
       currentUser = data.user;
       currentSession = data.session;
