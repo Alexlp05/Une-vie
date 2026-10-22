@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Une Vie — Simulation de destin</title>
+  <title>Une Vie — Simulation de destin v0.5</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,13 +26,25 @@
         <h2>Votre histoire commence ici</h2>
         <label class="field-label" for="input-name">Votre prénom</label>
         <input id="input-name" type="text" maxlength="20" placeholder="Ex : Camille">
+        
+        <p class="field-label">Votre sexe</p>
+        <div id="sex-list" class="trait-list" role="radiogroup"></div>
+
         <p class="field-label">Choisissez votre tempérament</p>
-        <div id="trait-list" class="trait-list"></div>
+        <div id="trait-list" class="trait-list" role="radiogroup"></div>
+
         <p class="field-label">Votre famille d'origine
           <button id="btn-reroll-origin" type="button" class="reroll-btn">🎲 Re-tirer</button>
         </p>
         <p class="origin-hint">Trois destins familiaux vous sont proposés au hasard. Ils ne décident pas de votre vie, mais ils vous offrent un point de départ.</p>
-        <div id="origin-list" class="origin-list"></div>
+        <div id="origin-list" class="origin-list" role="radiogroup"></div>
+
+        <p class="field-label">Votre personnalité <span id="personality-reroll-count" class="reroll-hint"></span>
+          <button id="btn-reroll-personality" type="button" class="reroll-btn" disabled>🎲 Re-tirer</button>
+        </p>
+        <p class="origin-hint">Votre personnalité émerge de votre héritage, votre milieu et du hasard. Vous pourrez la relancer <strong>2 fois maximum</strong>.</p>
+        <div id="personality-preview" class="personality-preview"></div>
+
         <button id="btn-create" class="btn btn-primary" disabled>Naître</button>
       </div>
     </section>
@@ -46,6 +58,11 @@
           <span id="char-age" class="age-badge">Âge 0</span>
         </div>
         <div class="trait-line" id="char-trait"></div>
+        <div class="game-actions">
+          <button id="btn-save" type="button" class="btn btn-ghost btn-small">💾 Sauvegarder</button>
+          <button id="btn-load" type="button" class="btn btn-ghost btn-small">📂 Charger</button>
+          <button id="btn-menu" type="button" class="btn btn-ghost btn-small">☰ Menu</button>
+        </div>
       </header>
 
       <div class="stats-grid" id="stats-grid"></div>
@@ -67,17 +84,30 @@
         </div>
       </div>
 
-      <div class="story-card">
-        <div class="story-stage" id="story-stage"></div>
-        <h3 class="story-title" id="story-title"></h3>
-        <p class="story-text" id="story-text"></p>
-        <div class="choices" id="choices"></div>
+      <!-- Onglets principaux -->
+      <nav id="tabs-container" class="tabs-bar" role="tablist" aria-label="Sections du jeu"></nav>
+
+      <div class="tab-panel" id="panel-vie" role="tabpanel" aria-labelledby="tab-vie">
+        <div class="story-card">
+          <div class="story-stage" id="story-stage"></div>
+          <h3 class="story-title" id="story-title"></h3>
+          <p class="story-text" id="story-text"></p>
+          <div class="choices" id="choices"></div>
+        </div>
+
+        <div class="timeline-wrap">
+          <h3 class="timeline-title">Chronique de vie</h3>
+          <ul class="timeline" id="timeline"></ul>
+        </div>
       </div>
 
-      <div class="timeline-wrap">
-        <h3 class="timeline-title">Chronique de vie</h3>
-        <ul class="timeline" id="timeline"></ul>
-      </div>
+      <div class="tab-panel hidden" id="panel-moi" role="tabpanel" aria-labelledby="tab-moi"></div>
+      <div class="tab-panel hidden" id="panel-proches" role="tabpanel" aria-labelledby="tab-proches"></div>
+      <div class="tab-panel hidden" id="panel-argent" role="tabpanel" aria-labelledby="tab-argent"></div>
+      <div class="tab-panel hidden" id="panel-carriere" role="tabpanel" aria-labelledby="tab-carriere"></div>
+      <div class="tab-panel hidden" id="panel-journal" role="tabpanel" aria-labelledby="tab-journal"></div>
+      <div class="tab-panel hidden" id="panel-arbre" role="tabpanel" aria-labelledby="tab-arbre"></div>
+
     </section>
 
     <!-- Écran de fin -->
@@ -98,9 +128,58 @@
       </div>
     </section>
 
+    <!-- Modal fiche personne -->
+    <div id="person-modal" class="modal hidden">
+      <div class="modal-backdrop" onclick="window.VIE.ui.personCard.close()"></div>
+      <div class="modal-content" id="person-card-content"></div>
+    </div>
+
+    <!-- Notification temporaire -->
+    <div id="toast" class="toast hidden"></div>
+
   </div>
 
+  <!-- Ordre de chargement critique : data.js (globals legacy) → config → lib → data → engine → ui → game -->
   <script src="data.js"></script>
+  <script src="config.js"></script>
+  <script src="lib/rng.js"></script>
+  <script src="lib/fmt.js"></script>
+  <script src="lib/util.js"></script>
+  <script src="data/traits.js"></script>
+  <script src="data/origins.js"></script>
+  <script src="data/names.js"></script>
+  <script src="data/careers.js"></script>
+<script src="data/milestones.js"></script>
+<script src="data/opportunities.js"></script>
+  <script src="data/events_famille.js"></script>
+  <script src="data/events_amour.js"></script>
+  <script src="data/events_amitie.js"></script>
+  <script src="data/events_pro.js"></script>
+  <script src="data/events_vices.js"></script>
+  <script src="data/events_sante.js"></script>
+  <script src="data/events_monde.js"></script>
+  <script src="data/events_passifs.js"></script>
+  <script src="data/config_events.js"></script>
+  <script src="engine/state.js"></script>
+  <script src="engine/personality.js"></script>
+  <script src="engine/people.js"></script>
+  <script src="engine/relations.js"></script>
+<script src="engine/encounters.js"></script>
+  <script src="engine/interactions.js"></script>
+  <script src="engine/events.js"></script>
+  <script src="engine/finance.js"></script>
+  <script src="engine/career.js"></script>
+  <script src="engine/health.js"></script>
+  <script src="engine/world.js"></script>
+  <script src="engine/save.js"></script>
+  <script src="ui/tabs.js"></script>
+  <script src="ui/personCard.js"></script>
+  <script src="ui/familyTree.js"></script>
+  <script src="ui/timeline.js"></script>
+  <script src="ui/financeView.js"></script>
+  <script src="ui/careerView.js"></script>
+  <script src="ui/statsView.js"></script>
+  <script src="ui/render.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

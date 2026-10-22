@@ -1,7 +1,6 @@
 /* ============================================================
-   UNE VIE — Moteur de jeu v0.3
-   Monde parallèle (économie, climat, société), finances liées,
-   années multi-actions, passions, destins extraordinaires.
+   UNE VIE — Moteur de jeu v0.8 (orchestrateur)
+   Combine : données legacy (data.js) + moteur v0.5 (engine/*, ui/*)
    ============================================================ */
 
 (function () {
@@ -11,61 +10,130 @@
   var usedEvents = {};
   var usedOpp = {};
   var usedWorldEvents = {};
-  var recentEvents = []; // track last N event IDs for deduplication
-  var narrativeMemory = {}; // key-value store for long-term consequences
+  var recentEvents = [];
+  var narrativeMemory = {};
+  var _lastStats = {};
+  var _lastEventWasPassive = false;
+  var gameOver = false;
 
   var STAT_KEYS = ["sante", "energie", "argent", "intelligence", "social", "bonheur"];
   var STAT_LABELS = {
-    sante: "Santé",
-    energie: "Énergie",
-    argent: "Argent",
-    intelligence: "Intelligence",
-    social: "Social",
-    bonheur: "Bonheur"
+    sante: "Santé", energie: "Énergie", argent: "Argent",
+    intelligence: "Intelligence", social: "Social", bonheur: "Bonheur"
   };
 
   function $(sel) { return document.querySelector(sel); }
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
   function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function uniqueId(prefix) {
+    return (prefix || "id") + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).substr(2, 9);
+  }
 
   function show(screenId) {
     var screens = document.querySelectorAll(".screen");
     for (var i = 0; i < screens.length; i++) screens[i].classList.add("hidden");
-    $("#" + screenId).classList.remove("hidden");
+    var target = $("#" + screenId);
+    if (target) target.classList.remove("hidden");
     window.scrollTo(0, 0);
+  }
+
+  /* ---------- Helpers legacy (data.js) ---------- */
+  function syncArgent() {
+    if (!state) return;
+    var net = window.VIE.engine.finance ? window.VIE.engine.finance.getNetWorth(state) : state.money;
+    state.stats.argent = clamp(Math.round(50 + 30 * Math.tanh((net / 50000 - 1) * 1.2)), 5, 100);
+  }
+
+  function addHistory(entry) {
+    if (!state) return;
+    state.history = state.history || [];
+    var e = entry || {};
+    if (e.type === undefined || e.type === null) e.type = "vie";
+    if (e.year === undefined || e.year === null) e.year = state.year;
+    if (e.age === undefined || e.age === null) e.age = state.age;
+    if (e.title === undefined || e.title === null) e.title = "";
+    if (e.result === undefined || e.result === null) e.result = "";
+    state.history.push(e);
+    if (state.history.length > 500) state.history.shift();
+  }
+
+  function findRelation(type) {
+    if (!state) return null;
+    var people = state.people || {};
+    for (var id in people) {
+      var p = people[id];
+      var lien = (p.liens || []).find(function (l) { return l.type === type || l.role === type; });
+      if (lien) return { person: p, lien: lien };
+    }
+    return null;
+  }
+
+  function relationStatus(rel) {
+    if (!rel) return "inconnu";
+    if (rel.type === "amour" || rel.role === "amour") {
+      if (rel.bond >= 80) return "Passionné(e)";
+      if (rel.bond >= 60) return "Amoureux(se)";
+      if (rel.bond >= 40) return "Couple";
+      if (rel.bond >= 20) return "Complice";
+      return "Lointain";
+    }
+    if (rel.bond >= 80) return "Très proche";
+    if (rel.bond >= 60) return "Proche";
+    if (rel.bond >= 40) return "Correct";
+    if (rel.bond >= 20) return "Tiède";
+    return "Éloigné";
+  }
+
+  function eventTypeLabel(event) {
+    var labels = {
+      vie: "Chapitre de vie", carriere: "Vie professionnelle", relation: "Relation",
+      aleatoire: "Événement du hasard", crise: "Crise", passion: "Passion",
+      sante: "Santé", famille: "Famille", argent: "Argent", social: "Social",
+      societe: "Société", business_mgmt: "Direction", passif: "Tranche de vie",
+      vices: "Habitudes", redemption: "Rédemption"
+    };
+    return labels[event.type] || "Chapitre de vie";
   }
 
   /* ---------- Écran titre ---------- */
   function initTitle() {
-    $("#btn-start").addEventListener("click", function () { showCreation(); });
-    $("#btn-replay").addEventListener("click", function () { showCreation(); });
+    var btnStart = $("#btn-start");
+    var btnReplay = $("#btn-replay");
+    if (btnStart) btnStart.addEventListener("click", function () { showCreation(); });
+    if (btnReplay) btnReplay.addEventListener("click", function () { showCreation(); });
   }
 
   function showCreation() {
     show("screen-creation");
     renderTraits();
+    renderSexes();
     renderOrigins();
+    if (window.VIE.ui.tabs && window.VIE.ui.tabs.init) window.VIE.ui.tabs.init();
   }
 
   /* ---------- Création ---------- */
   var selectedTrait = null;
   var selectedOrigin = null;
+  var selectedSexe = "homme";
 
   function refreshCreateBtn() {
-    $("#btn-create").disabled = !($("#input-name").value.trim() && selectedTrait && selectedOrigin);
+    var btn = $("#btn-create");
+    if (!btn) return;
+    btn.disabled = !($("#input-name").value.trim() && selectedTrait && selectedOrigin && selectedSexe);
   }
 
   function renderTraits() {
     var list = $("#trait-list");
+    if (!list) return;
     list.innerHTML = "";
     selectedTrait = null;
-    $("#btn-create").disabled = true;
 
-    TRAITS.forEach(function (trait) {
+    var traits = window.VIE.data?.traits?.archetypes || TRAITS || [];
+    traits.forEach(function (trait) {
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "trait-option";
-      btn.innerHTML = "<strong>" + trait.name + "</strong><small>" + trait.desc + "</small>";
+      btn.innerHTML = "<strong>" + (trait.name || trait.label || trait.id) + "</strong><small>" + (trait.desc || "") + "</small>";
       btn.addEventListener("click", function () {
         var opts = list.querySelectorAll(".trait-option");
         for (var i = 0; i < opts.length; i++) opts[i].classList.remove("selected");
@@ -75,24 +143,45 @@
       });
       list.appendChild(btn);
     });
+  }
 
-    $("#input-name").addEventListener("input", function () {
-      refreshCreateBtn();
+  function renderSexes() {
+    var list = $("#sex-list");
+    if (!list) return;
+    list.innerHTML = "";
+    selectedSexe = "homme";
+    [
+      { id: "homme", label: "Homme", desc: "Sexe masculin" },
+      { id: "femme", label: "Femme", desc: "Sexe féminin" }
+    ].forEach(function (sex) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "trait-option";
+      btn.innerHTML = "<strong>" + sex.label + "</strong><small>" + sex.desc + "</small>";
+      btn.addEventListener("click", function () {
+        var opts = list.querySelectorAll(".trait-option");
+        for (var i = 0; i < opts.length; i++) opts[i].classList.remove("selected");
+        btn.classList.add("selected");
+        selectedSexe = sex.id;
+        refreshCreateBtn();
+      });
+      list.appendChild(btn);
     });
   }
 
   function renderOrigins() {
     var list = $("#origin-list");
-    var draw = randomOrigins(3);
+    if (!list) return;
+    var origins = window.VIE.data?.origins || ORIGINS || [];
+    var shuffled = origins.slice().sort(function () { return Math.random() - 0.5; }).slice(0, 3);
     list.innerHTML = "";
     selectedOrigin = null;
-    $("#btn-create").disabled = true;
 
-    draw.forEach(function (origin) {
+    shuffled.forEach(function (origin) {
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "origin-option";
-      btn.innerHTML = '<strong>' + origin.name + '</strong><small class="origin-tag">' + origin.tagline + '</small><span class="origin-desc">' + origin.desc + '</span>';
+      btn.innerHTML = '<strong>' + origin.name + '</strong><small class="origin-tag">' + (origin.tagline || "") + '</small><span class="origin-desc">' + (origin.desc || "") + '</span>';
       btn.addEventListener("click", function () {
         var opts = list.querySelectorAll(".origin-option");
         for (var i = 0; i < opts.length; i++) opts[i].classList.remove("selected");
@@ -105,908 +194,466 @@
   }
 
   function initCreation() {
-    $("#btn-create").addEventListener("click", function () {
+    var btnCreate = $("#btn-create");
+    if (btnCreate) btnCreate.addEventListener("click", function () {
       var name = $("#input-name").value.trim();
-      if (!name || !selectedTrait || !selectedOrigin) return;
-      startGame(name, selectedTrait, selectedOrigin);
+      if (!name || !selectedTrait || !selectedOrigin || !selectedSexe) return;
+      startGame(name, selectedTrait, selectedOrigin, selectedSexe);
     });
-    $("#btn-reroll-origin").addEventListener("click", function () {
-      renderOrigins();
-    });
+    var btnReroll = $("#btn-reroll-origin");
+    if (btnReroll) btnReroll.addEventListener("click", function () { renderOrigins(); });
   }
 
   /* ---------- Nouvelle partie ---------- */
-  function startGame(name, trait, origin) {
-    state = {
-      name: name,
-      trait: trait,
-      origin: origin,
-      age: 0,
-      year: 1990 + Math.floor(Math.random() * 20),
-      slot: 0,
-      stats: { sante: 85, energie: 80, argent: 42, intelligence: 20, social: 20, bonheur: 60 },
-      money: 8,
-      career: null,
-      housing: "parents",
-      relations: [],
-      passions: {},
-      flags: [],
-      life: null,
-      lastCrisisAge: -10,
-      history: [],
-      yearLog: [],
-      world: worldStart(),
-      worldMods: { incomeMult: 1, expenses: 0, title: null, kind: null, text: null },
-      investments: { stocks: 0, realEstate: 0, business: 0 },
-      businessLevel: 0,
-      businessEmployees: 0,
-      businessReputation: 50
-    };
+  function startGame(name, trait, origin, sexe) {
+    var engine = window.VIE.engine;
+    var base = engine.state ? engine.state.create() : {};
+    var seed = Math.floor(Math.random() * 0x100000000);
+    if (window.VIE.rng) window.VIE.rng.init(seed);
 
-    for (var k in trait.effects) {
-      if (state.stats[k] !== undefined) state.stats[k] = clamp(state.stats[k] + trait.effects[k], 0, 100);
-    }
-    for (var o in (origin.effects || {})) {
-      if (state.stats[o] !== undefined) state.stats[o] = clamp(state.stats[o] + origin.effects[o], 0, 100);
-    }
-    state.money = origin.money;
-    if (state.money > 600) state.money = 600;
-    for (var p in (origin.passions || {})) state.passions[p] = origin.passions[p];
-    state.flags.push(origin.flag);
+    gameOver = false;
+    usedEvents = {};
+    usedOpp = {};
+    usedWorldEvents = {};
+    recentEvents = [];
+    narrativeMemory = {};
+    _lastEventWasPassive = false;
 
-    // La famille : les parents et, parfois, une fratrie
+    state = base;
+    // Enregistrer l'état dans le state manager (pour les modules UI)
+    if (engine.state && engine.state.set) engine.state.set(state);
+    state.name = name;
+    state.sexe = sexe;
+    state.origin = origin;
+    state.trait = trait;
+    state.archetypeBias = trait.bias || {};
+    state.rngSeed = seed;
+    state.year = 1990 + Math.floor(Math.random() * 20);
+    state.birthYear = state.year;
+    state.world = engine.world ? engine.world.create() : worldStart();
+    state.stats = state.stats || { sante: 85, energie: 80, argent: 42, intelligence: 20, social: 20, bonheur: 60, stress: 10, apparence: 50, reputation: 50, confiance: 50 };
+    state.habitudes = state.habitudes || { alcool: 0, tabac: 0, cannabis: 0, jeu: 0, sport: 0, alimentation: 50, sommeil: 50, ecrans: 0, soirees: 0, voyages: 0 };
+    state.dependances = state.dependances || {};
+    state.people = state.people || {};
+    state.history = state.history || [];
+    state.yearLog = state.yearLog || [];
+    state.narrativeMemory = state.narrativeMemory || {};
+    state.flags = state.flags || [];
+    state.passions = state.passions || {};
+    state.relations = state.relations || [];
+    state.investments = state.investments || { stocks: 0, realEstate: 0, business: 0 };
+
+    // Appliquer effets trait + origine
+    var effects = trait.effects || {};
+    Object.keys(effects).forEach(function (k) {
+      if (state.stats[k] !== undefined) state.stats[k] = clamp(state.stats[k] + effects[k], 0, 100);
+    });
+    var oEffects = origin.effects || origin.stats || {};
+    Object.keys(oEffects).forEach(function (k) {
+      if (state.stats[k] !== undefined) state.stats[k] = clamp(state.stats[k] + oEffects[k], 0, 100);
+    });
+    if (origin.money !== undefined) state.money = origin.money;
+    Object.keys(origin.passions || {}).forEach(function (p) { state.passions[p] = origin.passions[p]; });
+    if (origin.flag && state.flags.indexOf(origin.flag) === -1) state.flags.push(origin.flag);
+
+    // Personnalité (Big Five) si dispo
+    if (engine.personality) {
+      var res = engine.personality.generateAtBirth({
+        parents: [],
+        origin: origin.id,
+        archetype: trait.id
+      });
+      if (res) {
+        state.personality = res.personality;
+        state.traits = res.traits || [];
+      }
+    }
+
+    // Famille
     createFamily();
-
-    syncArgent();
 
     usedEvents = {};
     usedOpp = {};
     usedWorldEvents = {};
     recentEvents = [];
     narrativeMemory = {};
-    // Clear recentEvents is already done by reassignment above
+    _lastStats = {};
+
     show("screen-game");
+    if (window.VIE.ui.tabs && window.VIE.ui.tabs.init) window.VIE.ui.tabs.init();
     renderAll();
     renderTimeline();
 
-    var birth = null;
-    for (var i = 0; i < EVENTS.length; i++) {
-      if (EVENTS[i].id === "naissance") { birth = EVENTS[i]; break; }
+    // Premier événement
+    var naissance = null;
+    var allEvents = (window.VIE.engine.events && window.VIE.engine.events.getAll) ? window.VIE.engine.events.getAll() : EVENTS;
+    for (var i = 0; i < allEvents.length; i++) {
+      if (allEvents[i].id === "naissance") { naissance = allEvents[i]; break; }
     }
-    playEvent(birth);
+    if (!naissance) {
+      // Événement de secours si "naissance" absent
+      naissance = {
+        id: "fallback_naissance", stage: "bebe", type: "vie",
+        title: "Naissance", text: "Vous ouvrez les yeux. Le monde commence.",
+        choices: [{ text: "Vivre.", effects: { bonheur: 2 }, result: "La vie commence." }]
+      };
+    }
+    playEvent(naissance);
   }
 
   function createFamily() {
     var surname = randomSurname();
-    var pere = {
-      id: "rel_pere",
-      name: randomParentName("m"),
-      surname: surname,
-      type: "parent",
-      role: "Père",
-      trait: randomTrait("ami"),
-      bond: 62,
-      compat: 60 + Math.floor(Math.random() * 25),
-      sinceAge: 0
-    };
-    var mere = {
-      id: "rel_mere",
-      name: randomParentName("f"),
-      surname: surname,
-      type: "parent",
-      role: "Mère",
-      trait: randomTrait("ami"),
-      bond: 68,
-      compat: 60 + Math.floor(Math.random() * 25),
-      sinceAge: 0
-    };
-    state.relations.push(pere, mere);
+    state.surname = surname;
+    state.people = state.people || {};
 
+    var pereId = uniqueId("p");
+    var pere = makePerson(pereId, randomParentName("m"), surname, "homme", state.year - (30 + Math.floor(Math.random() * 20)), "pere");
+    var mereId = uniqueId("p");
+    var mere = makePerson(mereId, randomParentName("f"), surname, "femme", state.year - (30 + Math.floor(Math.random() * 20)), "mere");
+
+    state.people[pereId] = pere;
+    state.people[mereId] = mere;
+
+    pere.famille.push({ id: mereId, relation: "conjoint" });
+    mere.famille.push({ id: pereId, relation: "conjoint" });
+    pere.famille.push({ id: "self", relation: "enfant" });
+    mere.famille.push({ id: "self", relation: "enfant" });
+
+    // Frères et sœurs
     var nbSiblings = Math.random() < 0.4 ? 0 : (Math.random() < 0.55 ? 1 : (Math.random() < 0.8 ? 2 : 3));
-    var siblingNames = [];
+    var used = [];
     for (var i = 0; i < nbSiblings; i++) {
       var sibName = randomName();
       var guard = 0;
-      while ((siblingNames.indexOf(sibName) !== -1 || sibName === state.name) && guard < 20) {
-        sibName = randomName();
-        guard++;
-      }
-      siblingNames.push(sibName);
-      state.relations.push({
-        id: "rel_frat_" + i,
-        name: sibName,
-        surname: surname,
-        type: "fratrie",
-        role: (i === 0 ? "Aîné(e)" : i === nbSiblings - 1 ? "Cadet(te)" : "Milieu") + (i === 0 && nbSiblings === 1 ? "" : ""),
-        trait: randomTrait("ami"),
-        bond: 40 + Math.floor(Math.random() * 30),
-        compat: 55 + Math.floor(Math.random() * 35),
-        sinceAge: 0
+      while ((used.indexOf(sibName) !== -1 || sibName === state.name) && guard < 20) { sibName = randomName(); guard++; }
+      used.push(sibName);
+
+      var sibId = uniqueId("p");
+      var sibSexe = Math.random() < 0.5 ? "homme" : "femme";
+      var sibling = makePerson(sibId, sibName, surname, sibSexe, state.year - Math.floor(Math.random() * 5), "frere_soeur");
+      state.people[sibId] = sibling;
+
+      sibling.famille.push({ id: pereId, relation: "pere" });
+      sibling.famille.push({ id: mereId, relation: "mere" });
+      sibling.famille.push({ id: "self", relation: sibSexe === "femme" ? "soeur" : "frere" });
+      pere.famille.push({ id: sibId, relation: "enfant" });
+      mere.famille.push({ id: sibId, relation: "enfant" });
+
+      state.people["self"] = state.people["self"] || makePlayer();
+      state.people["self"].liens.push({
+        id: sibId, role: "frere_soeur", relation: sibSexe === "femme" ? "soeur" : "frere", statut: "proche",
+        affection: 40 + Math.floor(Math.random() * 30), confiance: 55 + Math.floor(Math.random() * 35), respect: 50,
+        attirance: 0, tension: 0, connaissance: 70, depuis: state.year, dernierContact: state.year, contactsParAn: 6
       });
+      state.people["self"].famille.push({ id: sibId, relation: sibSexe === "femme" ? "soeur" : "frere" });
     }
 
-    state.surname = surname;
-    addHistory({ age: 0, title: "Naissance", result: "Vous êtes né(e) dans la " + state.origin.name.toLowerCase() + ", chez les " + surname + "." });
+    state.people["self"] = state.people["self"] || makePlayer();
+    state.people["self"].liens.push({
+      id: pereId, role: "parent", relation: "pere", statut: "proche", affection: 62, confiance: 70, respect: 70,
+      attirance: 0, tension: 0, connaissance: 80, depuis: state.year, dernierContact: state.year, contactsParAn: 12
+    });
+    state.people["self"].liens.push({
+      id: mereId, role: "parent", relation: "mere", statut: "proche", affection: 68, confiance: 75, respect: 75,
+      attirance: 0, tension: 0, connaissance: 85, depuis: state.year, dernierContact: state.year, contactsParAn: 12
+    });
+    state.people["self"].famille.push({ id: pereId, relation: "pere" });
+    state.people["self"].famille.push({ id: mereId, relation: "mere" });
+
+    state.fatherId = pereId;
+    state.motherId = mereId;
+
+    addHistory({ age: 0, title: "Naissance", result: "Vous êtes né(e) dans la " + originName(state.origin) + ", chez les " + surname + "." });
   }
 
+  function originName(origin) {
+    return (origin && origin.name ? origin.name : "famille").toLowerCase();
+  }
+
+  function makePerson(id, nom, surname, sexe, naissance, role) {
+    return {
+      id: id, prenom: nom, nom: surname, sexe: sexe,
+      orientation: "hetero", naissance: naissance,
+      vivant: true, deces: null,
+      personnalite: { O: 50, C: 50, E: 50, A: 50, N: 50 },
+      traits: [],
+      valeurs: { famille: 70, carriere: 50, aventure: 30, argent: 50, fidelite: 60, creativite: 40, stabilite: 60, spiritualite: 40 },
+      desirEnfants: "veut",
+      apparence: 50, sante: 75, metier: "", niveauVie: 50, ville: "",
+      passions: {}, habitudes: {}, humeur: 50, conditions: [],
+      liens: [{
+        id: "self", role: role, statut: "proche", affection: role === "mere" ? 68 : 62,
+        confiance: 70, respect: 70, attirance: 0, tension: 0, connaissance: 80,
+        depuis: state.year, dernierContact: state.year, contactsParAn: 12
+      }],
+      famille: [], histoire: [], secrets: [], memoire: {}, niveauDetail: "proche"
+    };
+  }
+
+  function makePlayer() {
+    return {
+      id: "self", prenom: state.name, nom: state.surname || "", sexe: state.sexe,
+      orientation: null, naissance: state.birthYear || state.year,
+      vivant: true, deces: null,
+      personnalite: state.personality || { O: 50, C: 50, E: 50, A: 50, N: 50 },
+      traits: state.traits || [],
+      valeurs: { famille: 50, carriere: 50, aventure: 50, argent: 50, fidelite: 50, creativite: 50, stabilite: 50, spiritualite: 50 },
+      desirEnfants: "indecis",
+      apparence: 50, sante: 85, metier: "", niveauVie: 50, ville: "",
+      passions: state.passions || {}, habitudes: state.habitudes || {}, humeur: 50, conditions: [],
+      liens: [], famille: [], histoire: [], secrets: [], memoire: {}, niveauDetail: "proche"
+    };
+  }
+
+  /* ---------- Rendu ---------- */
   function renderAll() {
     renderHeader();
     renderStats();
-    renderCareer();
-    renderFinances();
-    renderWorld();
-    renderPassions();
-    renderRelations();
-    renderFamily();
-  }
-
-  /* ---------- Header & stats ---------- */
-  function renderHeader() {
-    $("#char-name").textContent = state.name;
-    $("#char-age").textContent = "Âge " + state.age + " · " + state.year;
-    $("#char-trait").textContent = state.trait.name + " · " + stageName(state.age);
-    $("#life-badge").textContent = state.life ? "Destin" : (stageForAge(state.age) === "vieillesse" ? "Crépuscule" : "Vie");
-  }
-
-  function stageName(age) {
-    for (var i = 0; i < STAGES.length; i++) {
-      if (age >= STAGES[i].min && age <= STAGES[i].max) return STAGES[i].name;
+    renderFamilyCard();
+    renderCareerCard();
+    renderFinancesCard();
+    renderWorldCard();
+    renderPassionsCard();
+    renderRelationsCard();
+    if (window.VIE.ui.tabs && window.VIE.ui.tabs.getActive) {
+      window.VIE.ui.tabs.renderActive(window.VIE.ui.tabs.getActive());
     }
-    return "Vieillesse";
+  }
+
+  function renderHeader() {
+    var n = $("#char-name"); if (n) n.textContent = state.name || "—";
+    var a = $("#char-age"); if (a) a.textContent = "Âge " + state.age + " · " + state.year;
+    var t = $("#char-trait"); if (t) t.textContent = (state.trait && (state.trait.name || state.trait.label)) || "";
+    var b = $("#life-badge"); if (b) b.textContent = state.life ? "Destin" : "Vie";
   }
 
   function renderStats() {
     var grid = $("#stats-grid");
-    grid.innerHTML = "";
-    STAT_KEYS.forEach(function (key) {
-      var val = state.stats[key];
-      var cls = val >= 60 ? "good" : (val >= 30 ? "mid" : "low");
-      var cell = document.createElement("div");
-      cell.className = "stat";
-      cell.innerHTML =
-        '<div class="stat-top"><span>' + STAT_LABELS[key] + '</span><b>' + val + '</b></div>' +
-        '<div class="stat-bar"><div class="stat-fill ' + cls + '" style="width:' + val + '%"></div></div>';
-      grid.appendChild(cell);
-    });
+    if (!grid) return;
+    var keys = ["sante", "energie", "argent", "intelligence", "social", "bonheur", "stress", "apparence", "reputation", "confiance"];
+    grid.innerHTML = keys.map(function (k) {
+      var val = state.stats[k] || 0;
+      var cls = val >= 70 ? "good" : (val >= 40 ? "mid" : "low");
+      return '<div class="stat"><div class="stat-top"><span>' + (STAT_LABELS[k] || k) + '</span><b>' + val + '</b></div><div class="stat-bar"><div class="stat-fill ' + cls + '" style="width:' + val + '%"></div></div></div>';
+    }).join("");
   }
 
-  /* ---------- Carrière ---------- */
-  function careerLevel(state) {
-    if (!state.career) return null;
-    var track = CAREER_TRACKS[state.career.track];
-    if (!track || !track.levels[state.career.level]) return null;
-    return track.levels[state.career.level];
-  }
-
-  function careerIncome(state) {
-    var lvl = careerLevel(state);
-    if (!lvl) return 0;
-    var income = lvl.salary[0] + Math.random() * (lvl.salary[1] - lvl.salary[0]);
-    var mood = 0.85 + (state.stats.bonheur / 100) * 0.3;
-    return Math.max(0, Math.round(income * mood));
-  }
-
-  function setCareer(trackId) {
-    state.career = { track: trackId, level: 0, sinceAge: state.age };
-  }
-
-  function renderCareer() {
-    var card = $("#career-card");
-    card.innerHTML = "<h4>Carrière</h4>";
-    if (!state.career) {
-      card.innerHTML += '<p class="info-empty">Le grand choix, à 18 ans, tracera votre route.</p>';
-      return;
-    }
-    var track = CAREER_TRACKS[state.career.track];
-    var lvl = track.levels[state.career.level];
-    var income = careerIncome(state);
-    var next = careerNext(state);
-    var html = '<p class="career-role">' + lvl.name + '</p>';
-    html += '<p class="career-track">' + track.name + ' · Niveau ' + (state.career.level + 1) + '/' + track.levels.length + '</p>';
-    html += '<p class="career-salary">Revenus ~' + income + ' k€/an (brut)' +
-      (next ? ' <span class="career-progress">· prochain : ' + next.name + '</span>' : '') + '</p>';
-    if (next) {
-      html += '<p class="career-progress">' + (careerCanAdvance(state) ? "Éligible à la promotion" : "En cours de progression") + '</p>';
-    }
-    card.innerHTML += html;
-  }
-
-  /* ---------- Finances ---------- */
-  function argentStat() { return clamp(40 + state.money / 3, 5, 100); }
-  function syncArgent() { state.stats.argent = argentStat(); }
-
-  function productivity() {
-    var m = 1;
-    var morale = state.stats.bonheur, en = state.stats.energie;
-    if (morale < 40) m -= (40 - morale) * 0.008;
-    if (en < 35) m -= (35 - en) * 0.008;
-    if (morale > 70) m += (morale - 70) * 0.004;
-    if (en > 75) m += (en - 75) * 0.004;
-    return Math.max(0.5, Math.min(1.3, m));
-  }
-
-  function childrenCount() {
-    return state.relations.filter(function (r) { return r.type === "enfant"; }).length;
-  }
-
-  function computeFinances() {
-    var econMult = ECONOMY_STATES[state.world.economy].mult;
-    var prod = productivity();
-    var income = 0;
-    if (state.career) income += careerIncome(state) * econMult * prod * state.worldMods.incomeMult;
-    // Investment income
-    var stockReturn = state.investments.stocks * (0.05 + (Math.random() - 0.5) * 0.15) * econMult;
-    var realEstateReturn = state.investments.realEstate * 0.03 * econMult;
-    var businessReturn = state.investments.business * (0.08 + (Math.random() - 0.5) * 0.2) * econMult;
-    income += stockReturn + realEstateReturn + businessReturn;
-    var housing = HOUSING[state.housing] || HOUSING.parents;
-    var baseCost = housing.cost;
-    if (state.housing === "parents") {
-      baseCost = 0;
-    }
-    var expenses = baseCost + (state.housing === "parents" ? 0 : 8) + childrenCount() * 5;
-    expenses *= (1 + state.world.inflation / 100);
-    expenses += state.worldMods.expenses;
-    if (state.stats.sante < 40) expenses += 3;
-    if (state.money > 150) expenses += Math.round(state.money * 0.05);
-    return { income: Math.round(income), expenses: Math.round(expenses), balance: Math.round(income - expenses) };
-  }
-
-  function applyAnnualFinances() {
-    var f = computeFinances();
-    state.money += f.balance;
-    if (state.money > 600) state.money = 600;
-    syncArgent();
-  }
-
-  function applyHousing(id) {
-    var tier = HOUSING[id];
-    if (!tier) return null;
-    if (state.housing === id) return null;
-    var prev = HOUSING[state.housing];
-    if (prev && prev.buy < 0 && tier.buy === 0) state.money += Math.round(-prev.buy * 0.6);
-    if (tier.buy < 0) state.money += tier.buy;
-    state.housing = id;
-    syncArgent();
-    return "Nouveau logement : " + tier.name;
-  }
-
-  function renderFinances() {
-    var card = $("#finances-card");
-    var f = computeFinances();
-    var housing = HOUSING[state.housing] || HOUSING.parents;
-    var html = "<h4>Finances</h4>";
-    html += '<p class="fin-line"><span>Épargne</span><b>' + (state.money >= 0 ? "+" : "") + state.money + ' k€</b></p>';
-    if (state.investments.stocks || state.investments.realEstate || state.investments.business) {
-      html += '<p class="fin-line"><span>Investissements</span><b>' +
-        (state.investments.stocks ? 'Actions: ' + state.investments.stocks + 'k€ ' : '') +
-        (state.investments.realEstate ? 'Immo: ' + state.investments.realEstate + 'k€ ' : '') +
-        (state.investments.business ? 'Entreprise: ' + state.investments.business + 'k€' : '') +
-        '</b></p>';
-    }
-    html += '<p class="fin-line"><span>Revenus/an</span><b>~' + f.income + ' k€</b></p>';
-    html += '<p class="fin-line"><span>Charges/an</span><b>~' + f.expenses + ' k€</b></p>';
-    html += '<p class="fin-line ' + (f.balance >= 0 ? "pos" : "neg") + '"><span>Solde</span><b>' + (f.balance >= 0 ? "+" : "") + f.balance + ' k€</b></p>';
-    html += '<p class="fin-sub">Logement : ' + housing.name + (state.relations.length ? " · " + childrenCount() + " enfant(s)" : "") + "</p>";
-    card.innerHTML = html;
-  }
-
-  /* ---------- Le monde ---------- */
-  function worldTick() {
-    economyEvolve(state.world);
-    state.worldMods = { incomeMult: 1, expenses: 0, title: null, kind: null, text: null };
-
-    if (Math.random() < 0.4) {
-      var pool = WORLD_EVENTS.filter(function (e) {
-        if (e.once && usedWorldEvents[e.id]) return false;
-        if (e.minAge !== undefined && state.age < e.minAge) return false;
-        return true;
-      });
-      if (pool.length) {
-        var total = 0;
-        pool.forEach(function (e) { total += e.weight; });
-        var r = Math.random() * total;
-        var chosen = pool[pool.length - 1];
-        for (var i = 0; i < pool.length; i++) {
-          r -= pool[i].weight;
-          if (r <= 0) { chosen = pool[i]; break; }
-        }
-        usedWorldEvents[chosen.id] = true;
-        if (chosen.effects) applyEffects(chosen.effects, { silent: true });
-        state.worldMods.incomeMult = chosen.incomeMult || 1;
-        state.worldMods.expenses = chosen.expenses || 0;
-        state.worldMods.title = chosen.title;
-        state.worldMods.kind = chosen.kind;
-        state.worldMods.text = chosen.text;
-        addHistory({ age: state.age, title: "Monde : " + chosen.title, result: chosen.text });
-      }
-    }
-  }
-
-  function renderWorld() {
-    var card = $("#world-card");
-    var econ = ECONOMY_STATES[state.world.economy];
-    var html = "<h4>Le monde</h4>";
-    html += '<p class="career-track">Économie : ' + econ.name + ' · Inflation ' + state.world.inflation + '%</p>';
-    if (state.worldMods.title) {
-      html += '<p class="world-event">' + state.worldMods.kind + ' : ' + state.worldMods.title + '</p>';
-    } else {
-      html += '<p class="info-empty">Une année sans grand bouleversement.</p>';
-    }
-    card.innerHTML = html;
-  }
-
-  /* ---------- Passions ---------- */
-  function addPassion(id, d) {
-    if (!PASSION_DEFS[id]) return null;
-    state.passions[id] = clamp((state.passions[id] || 0) + d, 0, 10);
-    state.stats.bonheur = clamp(state.stats.bonheur + d, 0, 100);
-    return "Passion : " + PASSION_DEFS[id].name + " +" + d;
-  }
-
-  function renderPassions() {
-    var card = $("#passions-card");
-    card.innerHTML = "<h4>Passions</h4>";
-    var entries = Object.keys(state.passions).map(function (k) { return { id: k, lvl: state.passions[k] }; });
-    entries.sort(function (a, b) { return b.lvl - a.lvl; });
-    if (!entries.length) {
-      card.innerHTML += '<p class="info-empty">Aucune passion encore. Le hasard vous fera découvrir des vocations.</p>';
-      return;
-    }
-    entries.slice(0, 4).forEach(function (e) {
-      var def = PASSION_DEFS[e.id];
-      var item = document.createElement("div");
-      item.className = "relation-item";
-      item.innerHTML =
-        '<span class="rel-name">' + def.icon + " " + def.name + '</span>' +
-        '<span class="rel-bar"><span class="rel-fill ' + (e.lvl >= 6 ? "strong" : "") + '" style="width:' + (e.lvl * 10) + '%"></span></span>' +
-        '<span class="rel-trait">' + e.lvl + '/10</span>';
-      card.appendChild(item);
-    });
-  }
-
-  /* ---------- Relations ---------- */
-  function findRelation(type) {
-    var best = null;
-    for (var i = 0; i < state.relations.length; i++) {
-      var r = state.relations[i];
-      if (r.type === type && (!best || r.bond > best.bond)) best = r;
-    }
-    return best;
-  }
-
-  function createRelation(type) {
-    var name = randomName();
-    var guard = 0;
-    while (state.relations.some(function (r) { return r.name === name; }) && guard < 20) {
-      name = randomName();
-      guard++;
-    }
-    var rel = {
-      id: "rel_" + Date.now() + "_" + Math.floor(Math.random() * 1e6),
-      name: name,
-      type: type,
-      trait: randomTrait(type),
-      bond: 15,
-      compat: 55 + Math.floor(Math.random() * 40),
-      sinceAge: state.age
-    };
-    state.relations.push(rel);
-    addHistory({ age: state.age, title: "Rencontre", result: "Vous avez rencontré " + rel.name + " (" + rel.trait + ")." });
-    return rel;
-  }
-
-  function relationStatus(rel) {
-    if (rel.type === "enfant") return "enfant";
-    if (rel.type === "parent") return "parent";
-    if (rel.type === "fratrie") return rel.bond >= 55 ? "proche" : "fratrie";
-    if (rel.type === "amour") {
-      if (state.flags.indexOf("marie") !== -1) return "conjoint(e)";
-      if (rel.bond >= 45) return "partenaire";
-      if (rel.bond >= 15) return "amoureux(se)";
-      return "flirt";
-    }
-    if (rel.bond >= 55) return "ami(e) proche";
-    if (rel.bond >= 25) return "ami(e)";
-    return "connaissance";
-  }
-
-  function applyRelation(relSpec) {
-    if (!relSpec) return;
-    var rel = findRelation(relSpec.type);
-    if (!rel && relSpec.create) rel = createRelation(relSpec.type);
-    if (!rel) return;
-    if (relSpec.delta) rel.bond = clamp(rel.bond + relSpec.delta, 0, 100);
-    if (rel.bond <= 0) {
-      var idx = state.relations.indexOf(rel);
-      if (idx !== -1) {
-        state.relations.splice(idx, 1);
-        addHistory({ age: state.age, title: "Rupture", result: "Votre lien avec " + rel.name + " s'est définitivement rompu." });
-      }
-    }
-  }
-
-  function relationPasses(relReq) {
-    if (!relReq) return true;
-    var rel = findRelation(relReq.type);
-    if (!rel) return false;
-    if (relReq.minBond !== undefined && rel.bond < relReq.minBond) return false;
-    return true;
-  }
-
-  function renderRelations() {
-    var card = $("#relations-card");
-    card.innerHTML = "<h4>Entourage</h4>";
-    if (!state.relations.length) {
-      card.innerHTML += '<p class="info-empty">Personne pour le moment. La vie réserve des rencontres.</p>';
-      return;
-    }
-    state.relations.slice().sort(function (a, b) { return b.bond - a.bond; }).forEach(function (rel) {
-      var item = document.createElement("div");
-      item.className = "relation-item";
-      var cls = rel.bond >= 55 ? "strong" : "";
-      item.innerHTML =
-        '<span class="rel-name">' + rel.name + '</span>' +
-        '<span class="rel-status">' + relationStatus(rel) + '</span>' +
-        '<span class="rel-bar"><span class="rel-fill ' + cls + '" style="width:' + rel.bond + '%"></span></span>' +
-        '<span class="rel-trait">' + rel.trait + '</span>';
-      card.appendChild(item);
-    });
-  }
-
-  /* ---------- Famille (panneau) ---------- */
-  function renderFamily() {
+  function renderFamilyCard() {
     var card = $("#family-card");
-    var html = "<h4>Famille d'origine</h4>";
+    if (!card) return;
+    var html = "<h4>Famille</h4>";
     if (state.origin) {
-      html += '<p class="fam-origin">' + state.origin.name + (state.surname ? " · les " + state.surname : "") + '</p>';
-      html += '<p class="fam-tagline">' + state.origin.tagline + '</p>';
-    } else {
-      html += '<p class="info-empty">Aucune origine définie.</p>';
+      html += '<p class="fam-origin">' + (state.origin.name || "") + "</p>";
+      if (state.origin.tagline) html += '<p class="fam-tagline">' + state.origin.tagline + "</p>";
     }
-    var fam = state.relations.filter(function (r) { return r.type === "parent" || r.type === "fratrie"; });
-    fam.slice().sort(function (a, b) { return (a.type === "parent" ? 0 : 1) - (b.type === "parent" ? 0 : 1); }).forEach(function (rel) {
-      var role = rel.role ? rel.role + " " : "";
-      html += '<div class="relation-item fam-item">' +
-        '<span class="rel-name">' + rel.name + '</span>' +
-        '<span class="rel-status">' + role + '</span>' +
-        '<span class="rel-bar"><span class="rel-fill ' + (rel.bond >= 55 ? "strong" : "") + '" style="width:' + rel.bond + '%"></span></span>' +
-        '<span class="rel-trait">' + rel.bond + '</span></div>';
+    if (state.surname) html += '<p class="fam-tagline">Nom : ' + state.surname + "</p>";
+    var people = Object.values(state.people || {});
+    var parents = people.filter(function (p) { return p.famille.some(function (f) { return f.relation === "enfant" && f.id === "self"; }); });
+    parents.forEach(function (p) {
+      var lien = (p.liens || []).find(function (l) { return l.id === "self"; }) || {};
+      html += '<div class="fam-item"><span class="rel-name">' + p.prenom + '</span> <span class="rel-status">(' + (lien.relation || "parent") + " · " + (lien.affection || 0) + "%)</span></div>";
+    });
+    var sibs = people.filter(function (p) { return p.famille.some(function (f) { return f.relation === "frere" || f.relation === "soeur"; }); });
+    sibs.forEach(function (s) {
+      var lien = (s.liens || []).find(function (l) { return l.id === "self"; }) || {};
+      html += '<div class="fam-item"><span class="rel-name">' + s.prenom + '</span> <span class="rel-status">(frère/sœur · ' + (lien.affection || 0) + "%)</span></div>";
+    });
+    if (!parents.length && !sibs.length) html += '<p class="info-empty">Seul(e) pour l\'instant.</p>';
+    card.innerHTML = html;
+  }
+
+  function renderCareerCard() {
+    var card = $("#career-card");
+    if (!card) return;
+    if (!state.career) { card.innerHTML = '<h4>Carrière</h4><p class="info-empty">Aucune carrière pour l\'instant.</p>'; return; }
+    var track = window.VIE.getCareerTrack ? window.VIE.getCareerTrack(state.career.track) : null;
+    if (!track) { card.innerHTML = '<h4>Carrière</h4><p class="info-empty">Carrière inconnue.</p>'; return; }
+    var lvl = track.levels[state.career.level];
+    var html = '<h4>Carrière</h4>';
+    html += '<p class="career-role">' + lvl.name + "</p>";
+    html += '<p class="career-track">' + track.name + " · Niveau " + (state.career.level + 1) + "/" + track.levels.length + "</p>";
+    if (window.VIE.engine.finance) {
+      var income = window.VIE.engine.finance.computeAnnualIncome(state).brutTotal;
+      html += '<p class="career-salary">Revenus ~' + window.VIE.util.formatMoney(income) + "/an (brut)</p>";
+    }
+    var next = track.levels[state.career.level + 1];
+    if (next) html += '<p class="career-progress">Prochain : ' + next.name + "</p>";
+    card.innerHTML = html;
+  }
+
+  function renderFinancesCard() {
+    var card = $("#finances-card");
+    if (!card) return;
+    if (!window.VIE.engine.finance) { card.innerHTML = '<h4>Finances</h4><p class="info-empty">—</p>'; return; }
+    var f = window.VIE.engine.finance.computeAnnualBalance(state);
+    var html = "<h4>Finances</h4>";
+    html += '<p class="fin-line"><span>Épargne</span><b>' + window.VIE.util.formatMoney(state.finance.compte || 0) + "</b></p>";
+    html += '<p class="fin-line"><span>Revenus/an</span><b>~' + window.VIE.util.formatMoney(f.income.total) + "</b></p>";
+    html += '<p class="fin-line"><span>Charges/an</span><b>~' + window.VIE.util.formatMoney(f.expenses) + "</b></p>";
+    html += '<p class="fin-line ' + (f.balance >= 0 ? "pos" : "neg") + '"><span>Solde</span><b>' + (f.balance >= 0 ? "+" : "") + window.VIE.util.formatMoney(f.balance) + "</b></p>";
+    card.innerHTML = html;
+  }
+
+  function renderWorldCard() {
+    var card = $("#world-card");
+    if (!card || !state.world) return;
+    var econ = window.VIE.config.world.economyStates[state.world.economy];
+    var html = "<h4>Monde</h4>";
+    html += '<p>Économie : <b>' + (econ ? econ.label : state.world.economy) + "</b></p>";
+    html += '<p>Inflation : <b>' + (state.world.inflation || 0).toFixed(1) + "%</b></p>";
+    html += "<p>Année : <b>" + state.year + "</b></p>";
+    if (state.world.techEra) html += "<p>Époque : <b>" + state.world.techEra.label + "</b></p>";
+    card.innerHTML = html;
+  }
+
+  function renderPassionsCard() {
+    var card = $("#passions-card");
+    if (!card) return;
+    var passions = state.passions || {};
+    var keys = Object.keys(passions);
+    if (!keys.length) { card.innerHTML = '<h4>Passions</h4><p class="info-empty">Aucune passion pour l\'instant.</p>'; return; }
+    var icons = { peinture: "🎨", musique: "🎵", ecriture: "✒️", sport: "🏃", cuisine: "🍳", technologie: "💻", nature: "🌲", theatre: "🎭", lecture: "📖", photo: "📸", voyage: "✈️" };
+    var html = "<h4>Passions</h4>";
+    keys.forEach(function (k) {
+      html += '<div class="passion-item"><span>' + (icons[k] || "⭐") + " " + k + '</span><span class="passion-level">Niv. ' + passions[k] + "</span></div>";
     });
     card.innerHTML = html;
   }
 
-  /* ---------- Timeline ---------- */
-  function addHistory(entry) {
-    state.history.unshift(entry);
-    if (state.history.length > 80) state.history.pop();
-    renderTimeline();
-  }
-
-  function renderTimeline() {
-    var ul = $("#timeline");
-    ul.innerHTML = "";
-    state.history.forEach(function (entry) {
-      var li = document.createElement("li");
-      li.innerHTML = '<span class="tl-age">' + entry.age + ' ans</span>' + entry.title +
-        '<span class="tl-result">' + entry.result + '</span>';
-      ul.appendChild(li);
+  function renderRelationsCard() {
+    var card = $("#relations-card");
+    if (!card) return;
+    var people = Object.values(state.people || {}).filter(function (p) {
+      return p.id !== "self" && p.vivant && (p.liens || []).some(function (l) { return l.affection > 0; });
     });
-  }
-
-  /* ---------- Filtres d'événement ---------- */
-  function passionPasses(req) {
-    if (!req) return true;
-    for (var k in req) {
-      if ((state.passions[k] || 0) < req[k]) return false;
-    }
-    return true;
-  }
-
-  function baseFilters(e) {
-    if (e.requiresFlag && state.flags.indexOf(e.requiresFlag) === -1) return false;
-    if (e.notFlag && state.flags.indexOf(e.notFlag) !== -1) return false;
-    if (e.minAge !== null && state.age < e.minAge) return false;
-    if (e.maxAge !== null && state.age > e.maxAge) return false;
-    if (e.requiresCareer && !state.career) return false;
-    if (e.requiresLife && state.life !== e.requiresLife) return false;
-    if (e.requiresWorld && state.world.economy !== e.requiresWorld) return false;
-    if (e.requiresRelation && !relationPasses(e.requiresRelation)) return false;
-    if (e.notRelation && findRelation(e.notRelation.type)) return false;
-    if (e.requiresPassion && !passionPasses(e.requiresPassion)) return false;
-    if (e.requiresFamily && (!state.origin || state.origin.flag !== e.requiresFamily)) return false;
-    if (e.minStat) {
-      for (var s in e.minStat) if (state.stats[s] < e.minStat[s]) return false;
-    }
-    return true;
-  }
-
-  function stageMatches(e) {
-    return e.stage === stageForAge(state.age);
-  }
-
-  function wasRecent(eid) {
-    return recentEvents.indexOf(eid) !== -1;
-  }
-
-  function setMemory(key, value) {
-    narrativeMemory[key] = value;
-  }
-
-  function getMemory(key) {
-    return narrativeMemory[key];
-  }
-
-  function hasMemory(key) {
-    return narrativeMemory.hasOwnProperty(key);
-  }
-
-  function pickEvent() {
-    var milestone = pendingMilestone();
-    if (milestone) return milestone;
-
-    var stageKey = stageForAge(state.age);
-    var pool = EVENTS.filter(function (e) {
-      if (e.type === "aleatoire" || e.type === "crise") return false;
-      if (usedEvents[e.id] && e.once !== false) return false;
-      if (wasRecent(e.id)) return false;
-      if (e.stage !== stageKey) return false;
-      return baseFilters(e);
+    if (!people.length) { card.innerHTML = '<h4>Relations</h4><p class="info-empty">Aucune relation significative.</p>'; return; }
+    var html = "<h4>Relations (" + people.length + ")</h4>";
+    people.slice(0, 6).forEach(function (p) {
+      var lien = p.liens.find(function (l) { return l.affection > 0; });
+      if (!lien) return;
+      html += '<div class="relation-item"><span class="rel-name">' + p.prenom + '</span>';
+      html += '<span class="rel-status">' + (lien.role || "") + " · " + (lien.statut || "") + "</span>";
+      html += '<div class="rel-bar"><div class="rel-fill ' + (lien.affection >= 70 ? "strong" : "") + '" style="width:' + lien.affection + '%"></div></div>';
+      html += "</div>";
     });
-    if (!pool.length) return null;
-    return rand(pool);
+    if (people.length > 6) html += '<p class="info-empty">… et ' + (people.length - 6) + " autres</p>";
+    card.innerHTML = html;
   }
 
-  function pendingMilestone() {
-    for (var m in MILESTONES) {
-      if (state.age >= parseInt(m, 10) && !usedEvents[MILESTONES[m].id]) return MILESTONES[m];
-    }
-    return null;
+  function renderTimeline(stateArg) {
+    var tl = $("#timeline");
+    if (!tl) return;
+    var s = stateArg || state;
+    var entries = (s.history || []).slice(-20).reverse();
+    var icons = { vie: "📖", carriere: "💼", relation: "🤝", aleatoire: "🎲", crise: "⚡", passion: "🔥", sante: "🩺", famille: "👨‍👩‍👧‍👦", argent: "💰", social: "🎉", societe: "🌍", deuil: "🕯️", formation: "📚", monde: "🌍" };
+    tl.innerHTML = entries.map(function (e) {
+      return '<li><span class="tl-age">' + e.age + " ans (" + e.year + ')</span> <span class="tl-icon">' + (icons[e.type] || "📝") + '</span> ' + (e.title || "") + '<span class="tl-result">' + (e.result || "") + "</span></li>";
+    }).join("");
   }
 
-  function rollRandomEvent() {
-    var pool = EVENTS.filter(function (e) {
-      if (e.type !== "aleatoire") return false;
-      if (usedEvents[e.id] && e.once !== false) return false;
-      if (wasRecent(e.id)) return false;
-      if (!stageMatches(e)) return false;
-      return baseFilters(e);
-    });
-    if (!pool.length) return null;
-    var total = 0;
-    pool.forEach(function (e) { total += e.weight; });
-    var r = Math.random() * total;
-    for (var i = 0; i < pool.length; i++) {
-      r -= pool[i].weight;
-      if (r <= 0) return pool[i];
-    }
-    return pool[pool.length - 1];
-  }
-
-  function crisisEvent() {
-    var triggered = null;
-    for (var i = 0; i < EVENTS.length; i++) {
-      var e = EVENTS[i];
-      if (e.type !== "crise") continue;
-      if (e.crisisCond && e.crisisCond(state)) { triggered = e; break; }
-    }
-    if (!triggered) return null;
-    if (state.age - state.lastCrisisAge < 3) return null;
-    if (wasRecent(triggered.id)) return null;
-    return triggered;
-  }
-
-  function genericEvent() {
-    var pool = EVENTS.filter(function (e) {
-      if (e.type !== "vie") return false;
-      if (e.once !== false) return false;
-      if (usedEvents[e.id] && e.once !== false) return false;
-      if (wasRecent(e.id)) return false;
-      if (e.stage !== stageForAge(state.age)) return false;
-      return baseFilters(e);
-    });
-    if (pool.length) return rand(pool);
-    // filet de sécurité : tout événement répétable
-    var any = EVENTS.filter(function (e) {
-      if (e.type === "aleatoire" || e.type === "crise") return false;
-      if (e.once !== false) return false;
-      if (wasRecent(e.id)) return false;
-      return baseFilters(e);
-    });
-    return any.length ? rand(any) : null;
-  }
-
-  /* ---------- Destins extraordinaires ---------- */
-  function findBusinessEvent() {
-    if (state.career.level < 2) return null;
-    var pool = EVENTS.filter(function (e) {
-      if (e.type !== "business_mgmt") return false;
-      if (usedEvents[e.id] && e.once !== false) return false;
-      if (wasRecent(e.id)) return false;
-      if (e.requiresCareerLevel && state.career.level < e.requiresCareerLevel) return false;
-      return baseFilters(e);
-    });
-    return pool.length ? rand(pool) : null;
-  }
-
-  function checkOpportunity() {
-    if (state.life || state.pendingOpp) return;
-    for (var i = 0; i < OPPORTUNITIES.length; i++) {
-      var opp = OPPORTUNITIES[i];
-      if (usedOpp[opp.id]) continue;
-      if (state.age < opp.ageMin) continue;
-      if (opp.ageMax && state.age > opp.ageMax) continue;
-      if (opp.cond(state) && Math.random() < 0.10) {
-        state.pendingOpp = opp;
-        usedOpp[opp.id] = true;
-        return;
-      }
-    }
-  }
-
-  function opportunityEvent() {
-    var opp = state.pendingOpp;
-    if (!opp) return null;
-    state.pendingOpp = null;
-    return {
-      id: "opp_" + opp.id,
-      stage: stageForAge(state.age),
-      title: "Une grande opportunité",
-      text: opp.intro + "\n\n[Chemin : " + opp.path + "]",
-      choices: opp.choices,
-      isOpportunity: true,
-      oppPath: opp.path,
-      type: "vie"
-    };
-  }
-
-  /* ---------- Sélection de l'événement du tour ---------- */
-  function chooseEventForAction() {
-    var ms = pendingMilestone();
-    if (ms) return ms;
-
-    var opp = opportunityEvent();
-    if (opp) return opp;
-
-    if (Math.random() < 0.25) {
-      var rnd = rollRandomEvent();
-      if (rnd) return rnd;
-    }
-
-    var cr = crisisEvent();
-    if (cr) {
-      state.lastCrisisAge = state.age;
-      return cr;
-    }
-
-    var e = pickEvent();
-    if (e) return e;
-
-    return genericEvent();
-  }
-
-  /* ---------- Affichage d'un événement ---------- */
+  /* ---------- Boucle de jeu ---------- */
   function playEvent(event) {
+    if (!event) return;
     if (event.once !== false) usedEvents[event.id] = true;
     recentEvents.push(event.id);
     if (recentEvents.length > 12) recentEvents.shift();
 
+    _lastEventWasPassive = event.passive || !event.choices || event.choices.length === 0;
+
+    // Les événements passifs ne passent pas par resolveChoice :
+    // on les enregistre auprès du moteur pour éviter les répétitions.
+    if (_lastEventWasPassive && window.VIE.engine.events && window.VIE.engine.events.markPlayed) {
+      window.VIE.engine.events.markPlayed(event);
+    }
+
     var theme = themeOf(event);
-    var th = THEMES[theme] || THEMES.vie;
-    $("#story-stage").textContent = th.icon + " " + eventTypeLabel(event) + " · " + stageName(state.age);
-    $("#story-title").textContent = event.title;
-    $("#story-text").textContent = event.text;
-    document.querySelector(".story-card").setAttribute("data-theme", theme);
+    var th = THEMES[theme] || THEMES.vie || { icon: "📖", label: "Vie" };
+    var stage = $("#story-stage");
+    if (stage) stage.textContent = (th.icon || "📖") + " " + eventTypeLabel(event) + " · " + stageName(state.age);
+    var title = $("#story-title"); if (title) title.textContent = event.title;
+    var text = $("#story-text"); if (text) text.textContent = event.text;
+    var card = document.querySelector(".story-card");
+    if (card) card.setAttribute("data-theme", theme);
 
     state.yearLog.push(event.title);
 
     var choices = $("#choices");
+    if (!choices) return;
     choices.innerHTML = "";
 
-    event.choices.forEach(function (choice, idx) {
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "choice-btn";
-      btn.textContent = choice.text;
-      if (choice.note) {
-        var note = document.createElement("span");
-        note.className = "choice-note";
-        note.textContent = choice.note;
-        btn.appendChild(note);
-      }
-      btn.addEventListener("click", function () {
-        resolveChoice(event, choice, idx);
+    if (_lastEventWasPassive) {
+      var cont = document.createElement("button");
+      cont.type = "button";
+      cont.className = "choice-btn next-btn";
+      cont.textContent = "Continuer";
+      cont.addEventListener("click", function () { nextAction(); });
+      choices.appendChild(cont);
+    } else {
+      event.choices.forEach(function (choice, idx) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "choice-btn";
+        btn.textContent = choice.text;
+        if (choice.note) {
+          var note = document.createElement("span");
+          note.className = "choice-note";
+          note.textContent = choice.note;
+          btn.appendChild(note);
+        }
+        btn.addEventListener("click", function () { resolveChoice(event, choice, idx); });
+        choices.appendChild(btn);
       });
-      choices.appendChild(btn);
-    });
+    }
 
     renderAll();
-    document.querySelector(".story-card").scrollIntoView({ behavior: "smooth", block: "start" });
+    var sc = document.querySelector(".story-card");
+    if (sc && sc.scrollIntoView) sc.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function eventTypeLabel(event) {
-    var labels = {
-      vie: "Chapitre de vie",
-      carriere: "Vie professionnelle",
-      relation: "Relation",
-      aleatoire: "Événement du hasard",
-      crise: "Crise",
-      passion: "Passion",
-      sante: "Santé",
-      famille: "Famille",
-      argent: "Argent",
-      social: "Social",
-      societe: "Société"
-    };
-    return labels[event.type] || "Chapitre de vie";
-  }
-
-  /* ---------- Résolution d'un choix ---------- */
   function resolveChoice(event, choice, idx) {
-    var effective = choice;
+    var engine = window.VIE.engine;
+    var resultText = "";
 
-    if (typeof choice.chance === "number") {
-      if (Math.random() < choice.chance) {
-        effective = { effects: choice.goodEffects || {}, result: choice.goodResult || choice.result, flag: choice.flag, unflag: choice.unflag, relation: choice.relation, housing: choice.housing, passion: choice.passion, passionDelta: choice.passionDelta, career: choice.career, retire: choice.retire, careerAdvance: choice.careerAdvance, careerBoost: choice.careerBoost };
-      } else {
-        effective = { effects: choice.badEffects || {}, result: choice.badResult || choice.result, flag: choice.flag, unflag: choice.unflag, relation: choice.relation, housing: choice.housing, passion: choice.passion, passionDelta: choice.passionDelta, career: choice.career, retire: choice.retire, careerAdvance: choice.careerAdvance, careerBoost: choice.careerBoost };
-      }
+    if (engine.events && engine.events.resolveChoice) {
+      var res = engine.events.resolveChoice(state, event, choice, idx, null);
+      resultText = res && (res.resultText || res.result) ? (res.resultText || res.result) : (choice.result || "");
+    } else {
+      // Fallback minimal
+      var fx = choice.effects || {};
+      Object.keys(fx).forEach(function (k) {
+        if (state.stats[k] !== undefined) state.stats[k] = clamp(state.stats[k] + fx[k], 0, 100);
+      });
+      resultText = choice.result || "";
     }
 
-    var notes = [];
+    // Afficher résultat + bouton suivant
+    var choices = $("#choices");
+    choices.innerHTML = "";
+    var res = document.createElement("div");
+    res.className = "story-result";
+    res.textContent = resultText;
+    choices.appendChild(res);
 
-    var deltas = applyEffects(effective.effects);
-    notes = notes.concat(deltas);
-
-    if (effective.flag) state.flags.push(effective.flag);
-    if (effective.unflag) {
-      var fi = state.flags.indexOf(effective.unflag);
-      if (fi !== -1) state.flags.splice(fi, 1);
-    }
-    if (effective.relation) applyRelation(effective.relation);
-
-    if (effective.passion && effective.passionDelta) {
-      var pMsg = addPassion(effective.passion, effective.passionDelta);
-      if (pMsg) notes.push(pMsg);
-    }
-
-    if (effective.housing) {
-      var hMsg = applyHousing(effective.housing);
-      if (hMsg) notes.push(hMsg);
-    }
-
-    var mainResult = effective.result || "La vie continue.";
-    var careerMsg = null;
-
-    if (effective.career) {
-      setCareer(effective.career);
-      careerMsg = "Vous commencez " + CAREER_TRACKS[effective.career].name.toLowerCase() + ".";
-    }
-    if (effective.retire) {
-      setCareer("retraite");
-      careerMsg = "Vous faites valoir vos droits à la retraite.";
-    }
-    if (effective.careerBoost && careerCanAdvance(state)) {
-      state.career.level++;
-      careerMsg = "Vos efforts sont récompensés : promotion !";
-    }
-    if (effective.careerAdvance) {
-      if (careerCanAdvance(state)) {
-        state.career.level++;
-        careerMsg = "La direction tranche : promotion accordée !";
-        mainResult = effective.goodResult || "Promotion !";
-      } else {
-        careerMsg = "Pas encore : les conditions manquent.";
-        mainResult = effective.badResult || "Promotion refusée.";
-      }
-    }
-
-    // Opportunité extraordinaire
-    if (event.isOpportunity && idx === 0) {
-      state.life = event.oppPath;
-      careerMsg = "Votre destin bascule : vous devenez " + event.oppPath.toLowerCase() + ".";
-      addHistory({ age: state.age, title: "Destin", result: "Vous avez saisi l'opportunité : " + event.oppPath + "." });
-    } else if (event.isOpportunity && idx === 1) {
-      addHistory({ age: state.age, title: "Opportunité déclinée", result: "Vous avez préféré votre voie actuelle." });
-    }
-
-    addHistory({
-      age: state.age,
-      title: event.title,
-      result: mainResult
-    });
-
-    // Affichage du résultat
-    var choicesWrap = $("#choices");
-    choicesWrap.innerHTML = "";
-    var resultP = document.createElement("p");
-    resultP.className = "story-result";
-    resultP.textContent = mainResult;
-    choicesWrap.appendChild(resultP);
-
-    if (careerMsg) {
-      var cMsg = document.createElement("p");
-      cMsg.className = "story-delta career-msg";
-      cMsg.textContent = careerMsg;
-      choicesWrap.appendChild(cMsg);
-    }
-
-    if (notes.length) {
-      var noteP = document.createElement("p");
-      noteP.className = "story-delta";
-      noteP.textContent = notes.join(" · ");
-      choicesWrap.appendChild(noteP);
-    }
-
-    var nextBtn = document.createElement("button");
-    nextBtn.type = "button";
-    nextBtn.className = "btn btn-primary next-btn";
-    nextBtn.textContent = "Continuer...";
-    nextBtn.addEventListener("click", function () { nextAction(); });
-    choicesWrap.appendChild(nextBtn);
+    var next = document.createElement("button");
+    next.type = "button";
+    next.className = "choice-btn next-btn";
+    next.textContent = "Continuer";
+    next.addEventListener("click", function () { nextAction(); });
+    choices.appendChild(next);
 
     renderAll();
   }
 
-  function applyEffects(fx, opts) {
-    opts = opts || {};
-    var deltas = [];
-    for (var k in (fx || {})) {
-      if (k === "argent") {
-        var av = fx.argent;
-        if (Array.isArray(av)) av = Math.round(av[0] + Math.random() * (av[1] - av[0]));
-        var moneyDelta = Math.round(av / 2);
-        state.money += moneyDelta;
-        syncArgent();
-        if (!opts.silent) deltas.push((moneyDelta >= 0 ? "+" : "") + moneyDelta + " k€");
-        continue;
-      }
-      if (k === "invest_stocks") {
-        var delta = Math.round(fx.invest_stocks / 2);
-        state.investments.stocks += delta;
-        state.money -= delta;
-        syncArgent();
-        if (!opts.silent) deltas.push(delta + " k€ en actions");
-        continue;
-      }
-      if (k === "invest_realestate") {
-        var delta = Math.round(fx.invest_realestate / 2);
-        state.investments.realEstate += delta;
-        state.money -= delta;
-        syncArgent();
-        if (!opts.silent) deltas.push(delta + " k€ en immobilier");
-        continue;
-      }
-      if (k === "invest_business") {
-        var delta = Math.round(fx.invest_business / 2);
-        state.investments.business += delta;
-        state.money -= delta;
-        syncArgent();
-        if (!opts.silent) deltas.push(delta + " k€ dans l'entreprise");
-        continue;
-      }
-      if (state.stats[k] === undefined) continue;
-      var delta = fx[k];
-      if (Array.isArray(delta)) delta = Math.round(delta[0] + Math.random() * (delta[1] - delta[0]));
-      var oldVal = state.stats[k];
-      state.stats[k] = clamp(state.stats[k] + delta, 0, 100);
-      if (!opts.silent && state.stats[k] !== oldVal) {
-        deltas.push((delta > 0 ? "+" : "") + delta + " " + STAT_LABELS[k]);
-      }
-    }
-    return deltas;
-  }
-
-  /* ---------- Déroulement : années multi-actions ---------- */
   function nextAction() {
-    if (state.stats.sante <= 0) { endGame("maladie"); return; }
+    if (!state) return;
+    if ((state.stats.sante || 0) <= 0) { endGame("maladie"); return; }
 
     var slots = slotsForAge(state.age);
-    if (state.slot >= slots - 1) {
-      advanceYear();
-    } else {
-      state.slot++;
+    if (!_lastEventWasPassive) {
+      if (state.slot >= slots - 1) advanceYear();
+      else state.slot++;
     }
+    _lastEventWasPassive = false;
 
     if (state.age >= 85) {
       var chance = Math.min(0.45, (state.age - 85) * 0.06);
@@ -1014,12 +661,21 @@
     }
     if (state.age >= 100) { endGame("vieux"); return; }
 
-    var ev = chooseEventForAction();
-    if (ev) {
-      playEvent(ev);
-    } else {
-      endGame("vieux");
+    var engine = window.VIE.engine;
+
+    // Interlude passif (sans choix) : joue avant l'événement principal
+    if (state.pendingPassive && state.pendingPassive.length) {
+      var passif = state.pendingPassive.shift();
+      if (state.pendingPassive.length === 0) state.pendingPassive = null;
+      if (passif) { playEvent(passif); return; }
     }
+
+    var ev = null;
+    if (engine.events && engine.events.chooseForAction) {
+      ev = engine.events.chooseForAction(state);
+    }
+    if (ev) playEvent(ev);
+    else endGame("vieux");
   }
 
   function advanceYear() {
@@ -1027,228 +683,297 @@
     state.age++;
     state.slot = 0;
 
-    for (var m in MILESTONES) {
-      if (state.age >= parseInt(m, 10) && !usedEvents[MILESTONES[m].id]) {
-        state.age = parseInt(m, 10);
-        break;
+    // Jalons d'âge : joués par le moteur (events.pickMilestone).
+    // Ne jamais recaler l'âge ici (cela créait une boucle infinie au jalon 18).
+
+    // Temps social
+    if (window.VIE.engine.relations && window.VIE.engine.relations.calculateSocialTime) {
+      state.tempsSocial = window.VIE.engine.relations.calculateSocialTime(state);
+    }
+
+    // Monde
+    if (window.VIE.engine.world && window.VIE.engine.world.tick) {
+      window.VIE.engine.world.tick(state);
+    }
+
+    // Finances
+    if (window.VIE.engine.finance && window.VIE.engine.finance.applyAnnual) {
+      window.VIE.engine.finance.applyAnnual(state);
+    } else {
+      state.money = clamp((state.money || 0) + 1000, -30, 600);
+    }
+
+    // Destins extraordinaires
+    if (window.VIE.engine.events && window.VIE.engine.events.checkOpportunities) {
+      window.VIE.engine.events.checkOpportunities(state);
+    }
+
+    // Interludes passifs (scènes sans choix, tirées au début de l'année)
+    if (window.VIE.engine.events && window.VIE.engine.events.pickPassive) {
+      var passifs = window.VIE.engine.events.pickPassive(state, 1);
+      state.pendingPassive = (passifs && passifs.length) ? passifs : null;
+    }
+
+    // PNJ
+    if (window.VIE.engine.people && window.VIE.engine.people.ageAll) {
+      window.VIE.engine.people.ageAll(state);
+    }
+
+    // Nouvelles rencontres (école, travail, voisinage, amour)
+    if (window.VIE.engine.encounters && window.VIE.engine.encounters.annual) {
+      window.VIE.engine.encounters.annual(state);
+    }
+
+    // Relations
+    if (window.VIE.engine.relations) {
+      if (window.VIE.engine.relations.accumulateTension) window.VIE.engine.relations.accumulateTension(state);
+      if (window.VIE.engine.relations.spontaneousContacts) window.VIE.engine.relations.spontaneousContacts(state);
+      if (window.VIE.engine.relations.progressHabits) window.VIE.engine.relations.progressHabits(state);
+      if (window.VIE.engine.relations.progressRedemption) window.VIE.engine.relations.progressRedemption(state);
+      if (window.VIE.engine.relations.checkSecrets) window.VIE.engine.relations.checkSecrets(state);
+    }
+
+    // Carrière
+    if (window.VIE.engine.career) {
+      if (window.VIE.engine.career.checkPromotion) window.VIE.engine.career.checkPromotion(state);
+      if (state.etudes && state.etudes.enCours && window.VIE.engine.career.advanceEducation) {
+        window.VIE.engine.career.advanceEducation(state);
       }
     }
 
-    worldTick();
-    applyAnnualFinances();
-    checkOpportunity();
-
-    // Annual business management for high-level entrepreneurs
-    if (state.career && state.career.track === "entreprise" && state.career.level >= 2) {
-      if (Math.random() < 0.3) {
-        var bizEvent = findBusinessEvent();
-        if (bizEvent) {
-          playEvent(bizEvent);
-        }
-      }
-    }
-
-    var amour = findRelation("amour");
-    if (amour && Math.random() < 0.18) {
-      var drift = Math.random() < (0.5 + ((amour.compat || 70) - 55) / 150) ? 3 : -2;
-      amour.bond = clamp(amour.bond + drift, 0, 100);
-    }
-
-    // Endettement critique
-    if (state.money < -30) {
-      state.money = clamp(state.money + 8, -30, 600);
-      addHistory({ age: state.age, title: "Finances sous pression", result: "Le découvert se creuse ; vous serrez le budget de toutes vos forces." });
+    // Santé (mortalité joueur)
+    if (window.VIE.engine.health && window.VIE.engine.health.shouldDie) {
+      var me = state.people && state.people["self"];
+      if (me && window.VIE.engine.health.shouldDie(me, state)) { endGame("maladie"); return; }
     }
 
     renderAll();
     showYearChange();
+
+    // Sauvegarde automatique (en fin d'année, une fois tout à jour)
+    if (window.VIE.engine.save && window.VIE.engine.save.save) {
+      try { window.VIE.engine.save.save("auto"); } catch (e) { /* sauvegarde non bloquante */ }
+    }
   }
 
-  /* ---------- Transition d'année + récapitulatif ---------- */
   function showYearChange() {
-    var recap = state.yearLog.slice(-6);
-    state.yearLog = [];
     var fade = $("#year-fade");
-    $("#year-fade-num").textContent = state.year;
-    var recapEl = $("#year-fade-recap");
-    if (recap.length) {
-      recapEl.innerHTML = recap.map(function (t) { return "<li>" + t + "</li>"; }).join("");
-    } else {
-      recapEl.innerHTML = "<li>Une année calme.</li>";
+    if (!fade) return;
+    var num = $("#year-fade-num"); if (num) num.textContent = state.year;
+    var recap = $("#year-fade-recap");
+    if (recap) {
+      var items = (state.yearLog || []).slice(-6);
+      recap.innerHTML = items.length ? items.map(function (t) { return "<li>" + t + "</li>"; }).join("") : "<li>Une année calme.</li>";
     }
+    state.yearLog = [];
     fade.classList.remove("show");
-    // forcer le reflow pour relancer l'animation
     void fade.offsetWidth;
     fade.classList.add("show");
     clearTimeout(state._yearFadeTimer);
-    state._yearFadeTimer = setTimeout(function () {
-      fade.classList.remove("show");
-    }, 2200);
+    state._yearFadeTimer = setTimeout(function () { fade.classList.remove("show"); }, 2200);
+  }
+
+  function stageName(age) {
+    if (typeof STAGES !== "undefined") {
+      for (var i = 0; i < STAGES.length; i++) {
+        if (age >= STAGES[i].min && age <= STAGES[i].max) return STAGES[i].name;
+      }
+    }
+    return "Vieillesse";
   }
 
   /* ---------- Fin de vie ---------- */
   function endGame(reason) {
-    var ending = ENDINGS[reason];
+    if (gameOver) return;
+    gameOver = true;
+    var ending = (typeof ENDINGS !== "undefined" && ENDINGS[reason]) || { kicker: "La fin", epitaph: "Chaque vie est un voyage." };
     var title = state.life ? state.life : lifeTitle(state);
 
-    $("#end-kicker").textContent = ending.kicker + (state.life ? " · " + state.life : "");
-    $("#end-title").textContent = title;
-    $("#end-epitaph").textContent = ending.epitaph;
+    var kicker = $("#end-kicker"); if (kicker) kicker.textContent = ending.kicker + (state.life ? " · " + state.life : "");
+    var t = $("#end-title"); if (t) t.textContent = title;
+    var epi = $("#end-epitaph"); if (epi) epi.textContent = ending.epitaph;
 
     var statsDiv = $("#end-stats");
-    statsDiv.innerHTML = "";
-    STAT_KEYS.forEach(function (key) {
-      var row = document.createElement("div");
-      row.className = "end-stat";
-      row.innerHTML = '<span>' + STAT_LABELS[key] + '</span><b>' + state.stats[key] + '</b>';
-      statsDiv.appendChild(row);
-    });
+    if (statsDiv) {
+      statsDiv.innerHTML = "";
+      STAT_KEYS.forEach(function (k) {
+        var row = document.createElement("div");
+        row.className = "end-stat";
+        row.innerHTML = '<span>' + STAT_LABELS[k] + '</span><b>' + (state.stats[k] || 0) + "</b>";
+        statsDiv.appendChild(row);
+      });
+    }
 
     var careerBox = $("#end-career");
-    var careerHtml = "<h4>Carrière & finances</h4>";
-    if (state.career) {
-      var track = CAREER_TRACKS[state.career.track];
-      var lvl = track.levels[state.career.level];
-      careerHtml += "<p>" + lvl.name + " — " + track.name + "</p>";
-    } else {
-      careerHtml += "<p>Aucune carrière définie.</p>";
+    if (careerBox) {
+      var careerHtml = "<h4>Carrière & finances</h4>";
+      if (state.career) {
+        var track = window.VIE.getCareerTrack ? window.VIE.getCareerTrack(state.career.track) : null;
+        if (track) careerHtml += "<p>" + track.levels[state.career.level].name + " — " + track.name + "</p>";
+      } else {
+        careerHtml += "<p>Aucune carrière définie.</p>";
+      }
+      careerHtml += "<p>Épargne finale : " + window.VIE.util.formatMoney(state.finance.compte || 0) + "</p>";
+      careerBox.innerHTML = careerHtml;
     }
-    careerHtml += "<p>Épargne finale : " + (state.money >= 0 ? "+" : "") + state.money + " k€ · Logement : " + (HOUSING[state.housing] ? HOUSING[state.housing].name : "?") + "</p>";
-    if (state.investments.stocks || state.investments.realEstate || state.investments.business) {
-      careerHtml += "<p>Investissements : " +
-        (state.investments.stocks ? 'Actions ' + state.investments.stocks + 'k€ ' : '') +
-        (state.investments.realEstate ? 'Immo ' + state.investments.realEstate + 'k€ ' : '') +
-        (state.investments.business ? 'Entreprise ' + state.investments.business + 'k€' : '') +
-        "</p>";
-    }
-    careerBox.innerHTML = careerHtml;
 
     var relBox = $("#end-relations");
-    var relHtml = "<h4>Entourage</h4>";
-    if (state.origin) {
-      relHtml += '<p class="end-family">Issue : ' + state.origin.name + ' · les ' + (state.surname || "") + '</p>';
+    if (relBox) {
+      var relHtml = "<h4>Entourage</h4>";
+      var people = Object.values(state.people || {}).filter(function (p) { return p.id !== "self"; });
+      if (people.length) {
+        people.slice(0, 12).forEach(function (p) {
+          var lien = (p.liens || []).find(function (l) { return l.id === "self"; }) || {};
+          relHtml += "<p>" + p.prenom + " — " + relationStatus(lien) + " (" + (lien.affection || 0) + "%)</p>";
+        });
+      } else {
+        relHtml += "<p>Une vie solitaire, mais digne.</p>";
+      }
+      relBox.innerHTML = relHtml;
     }
-    if (state.relations.length) {
-      state.relations.slice().sort(function (a, b) { return b.bond - a.bond; }).forEach(function (rel) {
-        relHtml += "<p>" + rel.name + " — " + relationStatus(rel) + " (" + rel.bond + ")</p>";
-      });
-    } else {
-      relHtml += "<p>Une vie solitaire, mais digne.</p>";
-    }
-    relBox.innerHTML = relHtml;
 
     var pasBox = $("#end-passions");
-    var pasHtml = "<h4>Passions</h4>";
-    var pas = Object.keys(state.passions).filter(function (k) { return state.passions[k] >= 3; });
-    if (pas.length) {
-      pasHtml += "<p>" + pas.map(function (k) { return PASSION_DEFS[k].name + " (" + state.passions[k] + ")"; }).join(" · ") + "</p>";
-    } else {
-      pasHtml += "<p>Peu de passions déclarées, mais une vie vécue pleinement.</p>";
+    if (pasBox) {
+      var pas = Object.keys(state.passions || {}).filter(function (k) { return state.passions[k] >= 3; });
+      var pasHtml = "<h4>Passions</h4>";
+      pasHtml += "<p>" + (pas.length ? pas.join(" · ") : "Peu de passions déclarées, mais une vie vécue pleinement.") + "</p>";
+      pasBox.innerHTML = pasHtml;
     }
-    pasBox.innerHTML = pasHtml;
 
-    var score = 0;
-    score += state.stats.bonheur * 2;
-    score += state.stats.sante;
-    score += Math.round(state.stats.argent);
-    score += state.stats.intelligence;
-    score += state.stats.social;
-    score += state.history.length * 2;
-    score += state.age;
-    if (state.career) score += (state.career.level + 1) * 4;
-    score += state.relations.length * 4;
-    score += Object.keys(state.passions).length * 3;
-    if (state.life) score += 40;
-    score += Math.max(0, Math.round(state.money));
-    $("#end-score").textContent = score;
+    var scoreEl = $("#end-score");
+    if (scoreEl) {
+      var score = 0;
+      score += (state.stats.bonheur || 0) * 2;
+      score += (state.stats.sante || 0);
+      score += (state.stats.intelligence || 0);
+      score += (state.stats.social || 0);
+      score += (state.history || []).length * 2;
+      score += state.age;
+      if (state.career) score += (state.career.level + 1) * 4;
+      if (state.life) score += 40;
+      scoreEl.textContent = score;
+    }
 
-    $("#end-synopsis").textContent = synopsis();
+    var syn = $("#end-synopsis");
+    if (syn) syn.textContent = buildSynopsis();
+
     show("screen-end");
   }
 
-  /* ---------- Synopsis généré ---------- */
-  function synopsis() {
-    var s = "";
-    var stats = state.stats;
-    var first = state.history.length > 0 ? state.history[state.history.length - 1] : null;
-
-    s += state.name + " est né(e) en " + (state.year - state.age) + ", avec un tempérament de " + state.trait.name.toLowerCase() + ". ";
-    if (state.origin) {
-      s += "Il/elle a grandi dans une " + state.origin.name.toLowerCase() + ", " + state.origin.tagline.toLowerCase() + ". ";
-    }
-    s += "Il/elle a grandi dans un monde " + (state.world.economy === "boom" ? "prospère" : state.world.economy === "crisis" ? "marqué par la crise" : "stable") + ". ";
-
-    var parents = state.relations.filter(function (r) { return r.type === "parent"; });
-    var fratrie = state.relations.filter(function (r) { return r.type === "fratrie"; });
-    if (parents.length && state.origin) {
-      var noms = parents.map(function (p) { return p.role + " " + p.name; });
-      s += "Ses origines chez les " + (state.surname || "") + " ont été portées par " + noms.join(" et ") + ". ";
-    }
-
-    if (first && first.age <= 5) s += "Son tout premier souvenir reste « " + first.title.toLowerCase() + " ». ";
-
-    var moments = state.history.slice(0, 3);
-    if (moments.length) {
-      s += "Sa vie a été marquée par « " + moments[0].title.toLowerCase() + " », puis « " +
-        moments[1].title.toLowerCase() + " » et enfin « " + moments[2].title.toLowerCase() + " ». ";
-    }
-
+  function buildSynopsis() {
+    var s = state.name + " est né(e) en " + (state.birthYear || state.year) + " dans une " + originName(state.origin) + ".";
     if (state.career) {
-      var track = CAREER_TRACKS[state.career.track];
-      var lvl = track.levels[state.career.level];
-      if (track.name === "Retraite") s += "Après une longue route professionnelle, il/elle a savouré sa retraite. ";
-      else s += "Sur le plan professionnel, il/elle est devenu(e) « " + lvl.name + " » dans la " + track.name.toLowerCase() + ". ";
+      var track = window.VIE.getCareerTrack ? window.VIE.getCareerTrack(state.career.track) : null;
+      if (track) s += " Il/elle a fait carrière dans " + track.name + ".";
     }
-
-    var amour = findRelation("amour");
-    var enfants = state.relations.filter(function (r) { return r.type === "enfant"; });
-    if (state.flags.indexOf("marie") !== -1 && amour) {
-      s += "Il/elle a partagé sa vie avec " + amour.name + ". ";
-      if (enfants.length) s += enfants.length + " enfant(s) sont venus illuminer ses jours. ";
-    } else if (amour) {
-      s += "Une histoire d'amour a marqué sa route : " + amour.name + ". ";
-    }
-
-    var pas = Object.keys(state.passions).filter(function (k) { return state.passions[k] >= 4; });
-    if (pas.length) {
-      s += "Ses passions l'ont porté(e) : " + pas.map(function (k) { return PASSION_DEFS[k].name; }).join(", ") + ". ";
-    }
-
-    if (state.life) {
-      s += "Son destin a pris un tour extraordinaire : " + state.life.toLowerCase() + ". ";
-    }
-
-    var dominant = null;
-    var maxVal = -1;
-    STAT_KEYS.forEach(function (k) {
-      if (stats[k] > maxVal) { maxVal = stats[k]; dominant = k; }
-    });
-    if (maxVal >= 70) {
-      var phrases = {
-        bonheur: "Une joie contagieuse l'a accompagné(e), préférant les rires aux regrets.",
-        sante: "Son corps a été un fidèle compagnon, entretenu comme un jardin précieux.",
-        argent: "La prospérité a fini par lui sourire, fruit d'un travail patient.",
-        intelligence: "Son esprit insatiable a toujours cherché à comprendre le monde.",
-        social: "Il/elle a tissé des liens durables, et sa maison n'a jamais manqué de visages aimés.",
-        energie: "Sa vitalité a étonné jusqu'à la fin, toujours en mouvement."
-      };
-      s += phrases[dominant] + " ";
-    } else {
-      s += "La route a parfois été rude, mais chaque épreuve a laissé une cicatrice et une leçon. ";
-    }
-
-    if (stats.bonheur >= 70) s += "Il/elle s'est éteint(e) apaisé(e), le cœur rempli de ce qu'il/elle a aimé.";
-    else if (stats.bonheur < 35) s += "Il/elle s'est éteint(e) en se demandant si tout cela avait un sens.";
-    else s += "Il/elle s'est éteint(e) avec le sentiment d'avoir vécu sa vie, ni plus, ni moins.";
-
+    if (state.life) s += " Son destin : " + state.life + ".";
+    var people = Object.values(state.people || {}).filter(function (p) { return p.id !== "self" && p.vivant; });
+    if (people.length) s += " " + people.length + " proches l'ont accompagné(e).";
+    s += " À " + state.age + " ans, " + (state.stats.bonheur >= 70 ? "il/elle s'en va apaisé(e)." : "il/elle s'en va, la tête pleine de tout ce qui a été vécu.");
     return s;
+  }
+
+  /* ---------- Sauvegarde / Chargement ---------- */
+  function saveGame(slot) {
+    if (!state) return { ok: false, reason: "Aucune partie en cours" };
+    var engine = window.VIE.engine;
+    if (!engine.save || !engine.save.save) return { ok: false, reason: "Sauvegarde indisponible" };
+    // L'état du jeu est la référence partagée avec le state manager
+    if (engine.state && engine.state.set) engine.state.set(state);
+    var res = engine.save.save(slot || "auto");
+    if (res.ok) flash("Partie sauvegardée.");
+    return res;
+  }
+
+  function loadGame(slot) {
+    var engine = window.VIE.engine;
+    if (!engine.save || !engine.save.load) return { ok: false, reason: "Chargement indisponible" };
+    var res = engine.save.load(slot || "auto");
+    if (!res.ok) return res;
+    state = engine.state.get();
+    gameOver = false;
+    usedEvents = {};
+    usedOpp = {};
+    usedWorldEvents = {};
+    recentEvents = [];
+    _lastEventWasPassive = false;
+    show("screen-game");
+    renderAll();
+    flash("Partie chargée.");
+    return res;
+  }
+
+  function flash(msg) {
+    var el = document.getElementById("toast");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove("hidden");
+    if (window.setTimeout) {
+      window.setTimeout(function () { el.classList.add("hidden"); }, 2200);
+    }
+  }
+
+  function initGameActions() {
+    var saveBtn = document.getElementById("btn-save");
+    if (saveBtn) saveBtn.addEventListener("click", function () { saveGame("auto"); });
+    var loadBtn = document.getElementById("btn-load");
+    if (loadBtn) loadBtn.addEventListener("click", function () {
+      var res = loadGame("auto");
+      if (!res.ok) flash("Aucune sauvegarde à charger.");
+    });
+    var menuBtn = document.getElementById("btn-menu");
+    if (menuBtn) menuBtn.addEventListener("click", function () { showCreation(); });
   }
 
   /* ---------- Init ---------- */
   function init() {
     initTitle();
     initCreation();
+    initGameActions();
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  /* ---------- Exports ---------- */
+  window.VIE = window.VIE || {};
+  window.VIE.engine = window.VIE.engine || {};
+  // NE PAS écraser engine.state (géré par engine/state.js)
+  window.VIE.game = {
+    getState: function () { return state; },
+    getStats: function () { return state ? state.stats : null; },
+    isOver: function () { return gameOver; },
+    saveGame: saveGame,
+    loadGame: loadGame,
+    renderAll: renderAll,
+    renderTimeline: renderTimeline,
+    advanceYear: advanceYear,
+    nextAction: nextAction,
+    playEvent: playEvent,
+    startGame: startGame,
+    showCreation: showCreation,
+    createFamily: createFamily,
+    getPlayerId: function () { return "self"; }
+  };
+  // L'état canonique est celui du state manager (il peut être remplacé
+  // par un chargement de sauvegarde) : on délègue à celui-ci.
+  window.VIE.engine.getState = function () {
+    return (window.VIE.engine.state && window.VIE.engine.state.get) ? window.VIE.engine.state.get() : state;
+  };
+  window.VIE.engine.getStats = function () {
+    var s = window.VIE.engine.getState();
+    return s ? s.stats : null;
+  };
+  window.VIE.engine.renderAll = renderAll;
+  window.VIE.engine.renderTimeline = renderTimeline;
+  window.VIE.engine.advanceYear = advanceYear;
+  window.VIE.engine.nextAction = nextAction;
+  window.VIE.engine.playEvent = playEvent;
+  window.VIE.engine.startGame = startGame;
+  window.VIE.engine.showCreation = showCreation;
+  window.VIE.engine.createFamily = createFamily;
+  window.VIE.engine.getPlayerId = window.VIE.game.getPlayerId;
 })();
