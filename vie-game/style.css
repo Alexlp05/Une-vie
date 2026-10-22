@@ -2324,3 +2324,224 @@ body {
   font-style: italic;
   padding: 20px;
 }
+
+/* ============================================================
+   RESPONSIVE DESIGN
+   ============================================================ */
+
+@media (max-width: 768px) {
+  #app {
+    padding: 16px 12px 40px;
+  }
+
+  .title-card {
+    padding: 60px 16px;
+  }
+
+  .title-main {
+    font-size: 2.5rem;
+  }
+
+  .creation-card {
+    margin: 20px auto;
+    padding: 24px 20px;
+  }
+
+  .creation-card h2 {
+    font-size: 1.5rem;
+  }
+
+  .trait-list {
+    grid-template-columns: 1fr;
+  }
+
+  .origin-list {
+    grid-template-columns: 1fr;
+  }
+
+  .game-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 6px 10px;
+  }
+
+  .identity {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .game-actions {
+    flex-wrap: wrap;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .status-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .info-card {
+    padding: 12px 14px;
+  }
+
+  .story-card {
+    padding: 20px 16px 18px;
+    margin-bottom: 16px;
+  }
+
+  .story-title {
+    font-size: 1.3rem;
+  }
+
+  .story-text {
+    font-size: 1rem;
+  }
+
+  .choice-btn {
+    font-size: 0.95rem;
+    padding: 12px 14px;
+  }
+
+  .tabs-bar {
+    overflow-x: auto;
+    padding-bottom: 10px;
+    scrollbar-width: none;
+  }
+
+  .tabs-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 0.9rem;
+    padding: 10px 16px;
+  }
+
+  .person-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .person-bars {
+    width: 100%;
+  }
+
+  .person-bars .bar {
+    width: 100%;
+  }
+
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    max-height: 90vh;
+  }
+
+  .person-card-content {
+    max-width: none;
+    width: 90vw;
+    max-height: 90vh;
+  }
+
+  .finance-header {
+    grid-template-columns: 1fr;
+  }
+
+  .budget-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .invest-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .career-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .career-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .career-satisfaction .bar {
+    width: 100%;
+  }
+
+  .career-actions {
+    flex-direction: column;
+  }
+
+  .career-actions .btn {
+    width: 100%;
+  }
+
+  .end-card {
+    padding: 30px 20px;
+  }
+
+  .end-card h2 {
+    font-size: 1.8rem;
+  }
+
+  .end-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .end-buttons .btn {
+    width: 100%;
+  }
+
+  #screen-auth .title-card {
+    padding: 40px 20px;
+  }
+
+  #auth-form {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  #app {
+    padding: 12px 8px 40px;
+  }
+
+  .title-main {
+    font-size: 2rem;
+  }
+
+  .stats-grid .stat {
+    padding: 8px 10px;
+  }
+
+  .stat-top {
+    font-size: 0.75rem;
+  }
+
+  .stat-top b {
+    font-size: 0.8rem;
+  }
+
+  .choice-btn {
+    font-size: 0.9rem;
+    padding: 10px 12px;
+  }
+
+  .impact-row {
+    font-size: 0.85rem;
+    padding: 5px 10px;
+  }
+
+  .tab-btn {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+  }
+}
