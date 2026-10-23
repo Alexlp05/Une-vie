@@ -1155,10 +1155,15 @@
     // 1. Transition d'année (fade avec résumé)
     showYearChange();
     
-    // 2. Après le fade, afficher le bilan
+    // 2. Après le fade, afficher le bilan (à partir de 10 ans)
     setTimeout(function() {
       if (gameOver) return;
-      showYearSummary();
+      if (state.age >= 10) {
+        showYearSummary();
+      } else {
+        // Même avant 10 ans, on peut avancer sans bilan détaillé
+        renderAll();
+      }
     }, 2500); // attendre la fin du fade
   }
 

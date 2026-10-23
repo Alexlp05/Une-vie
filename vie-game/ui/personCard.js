@@ -134,7 +134,7 @@
     return html;
   }
 
-  // ── FICHE PERSONNE (modale/panneau) ───────────────────────
+  // ── FICHE PERSONNE (modale détaillée) ───────────────────────
   function openPersonCard(personId) {
     _selectedPersonId = personId;
     var state = window.VIE.engine.state.get();
@@ -144,7 +144,7 @@
     var modal = document.getElementById("person-modal");
     if (!modal) { createModal(); modal = document.getElementById("person-modal"); }
 
-    renderPersonCard(person, state);
+    renderDetailedPersonCard(person, state);
     modal.classList.remove("hidden");
     document.body.style.overflow = "hidden";
   }
