@@ -1121,7 +1121,9 @@
     }
 
     renderAll();
-    showYearChange();
+    
+    // Séquence de fin d'année : transition → bilan → voeux
+    runYearEndSequence();
 
     // Sauvegarde automatique (en fin d'année, une fois tout à jour)
     if (window.VIE.engine.save && window.VIE.engine.save.save) {
@@ -1134,11 +1136,120 @@
         console.warn("Sauvegarde cloud échouée:", e);
       });
     }
+  }
 
-    // Vœux de fin d'année (à partir de 18 ans)
-    if (state.age >= 18 && !gameOver) {
+  // ════════════════════════════════════════════════════════════════════
+  // SÉQUENCE DE FIN D'ANNÉE : Transition → Bilan → Vœux
+  // ═══════════════════════════════════════════════════════════════════
+
+  function runYearEndSequence() {
+    // 1. Transition d'année (fade avec résumé)
+    showYearChange();
+    
+    // 2. Après le fade, afficher le bilan
+    setTimeout(function() {
+      if (gameOver) return;
+      showYearSummary();
+    }, 2500); // attendre la fin du fade
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // BILAN DE L'ANNÉE
+  // ═══════════════════════════════════════════════════════════════════
+
+  function showYearSummary() {
+    // Calculer les stats du bilan
+    var summary = computeYearSummary();
+    
+    var overlay = document.createElement("div");
+    overlay.id = "summary-overlay";
+    overlay.className = "summary-overlay";
+    overlay.innerHTML = 
+      '<div class="summary-card">' +
+        '<div class="summary-header">' +
+          '<h2>📊 Bilan de l\'année ' + (state.year - 1) + '</h2>' +
+          '<p class="summary-subtitle">Âge : ' + (state.age - 1) + ' ans | Année ' + (state.year - 1) + '</p>' +
+        '</div>' +
+        '<div class="summary-stats">' +
+          '<div class="summary-stat"><span class="sum-label">Santé</span><span class="sum-value ' + (state.stats.sante >= 70 ? 'good' : state.stats.sante >= 40 ? 'mid' : 'low') + '">' + (state.stats.sante || 0) + '/100</span></div>' +
+          '<div class="summary-stat"><span class="sum-label">Bonheur</span><span class="sum-value ' + (state.stats.bonheur >= 70 ? 'good' : state.stats.bonheur >= 40 ? 'mid' : 'low') + '">' + (state.stats.bonheur || 0) + '/100</span></div>' +
+          '<div class="summary-stat"><span class="sum-label">Argent</span><span class="sum-value ' + (state.stats.argent >= 70 ? 'good' : state.stats.argent >= 40 ? 'mid' : 'low') + '">' + (state.stats.argent || 0) + '/100</span></div>' +
+          '<div class="summary-stat"><span class="sum-label">Relations</span><span class="sum-value ' + (state.stats.social >= 70 ? 'good' : state.stats.social >= 40 ? 'mid' : 'low') + '">' + (state.stats.social || 0) + '/100</span></div>' +
+        '</div>' +
+        '<div class="summary-section">' +
+          '<h4>📅 Événements marquants</h4>' +
+          '<ul class="year-events">' + getYearEventsHtml() + '</ul>' +
+        '</div>' +
+        '<div class="summary-section">' +
+          '<h4>👥 Relations</h4>' +
+          '<div class="relation-summary">' + getRelationsHtml() + '</div>' +
+        '</div>' +
+        '<div class="summary-section">' +
+          '<h4>💼 Carrière & Finances</h4>' +
+          '<div class="career-fin-summary">' + getCareerFinanceHtml() + '</div>' +
+        '</div>' +
+        '<div class="summary-actions">' +
+          '<button id="btn-continue-to-wishes" class="btn btn-primary">Continuer vers les vœux →</button>' +
+          '<button id="btn-skip-wishes" class="btn btn-ghost btn-small">Ignorer les vœux</button>' +
+        '</div>' +
+      '</div>';
+    
+    document.body.appendChild(overlay);
+    
+    // Événements
+    overlay.querySelector("#btn-continue-to-wishes").addEventListener("click", function() {
+      document.getElementById("summary-overlay").remove();
       makeWishes(state);
+    });
+    overlay.querySelector("#btn-skip-wishes").addEventListener("click", function() {
+      document.getElementById("summary-overlay").remove();
+      _wishesPhase = false;
+      renderAll();
+    });
+  }
+
+  function getYearEventsHtml() {
+    var entries = (state.yearLog || []).slice(-8);
+    if (!entries.length) return '<li class="empty">Une année calme.</li>';
+    return entries.map(function(e) {
+      return '<li><span class="event-age">[' + e.age + ' ans]</span> ' + e + '</li>';
+    }).join('');
+  }
+
+  function getRelationsHtml() {
+    var people = Object.values(state.people || {}).filter(function(p) { return p.id !== "self" && p.vivant; });
+    var links = [];
+    people.forEach(function(p) {
+      var lien = p.liens.find(function(l) { return l.id === "self"; });
+      if (lien && lien.affection > 0) {
+        var roleLabel = {
+          "amour": "❤️ Amour", "ami": "🤝 Ami", "ami_proche": "🤝 Ami proche",
+          "meilleur_ami": "💎 Meilleur ami", "conjoint": "💍 Conjoint",
+          "pere": "👨 Père", "mere": "👩 Mère", "frere": "👨 Frère", "soeur": "👩 Sœur",
+          "enfant": "👶 Enfant", "conjoint": "💍 Conjoint", "ex": "💔 Ex"
+        }[p.liens.find(function(l) { return l.id === "self"; })?.role] || "👤";
+        return '<span class="relation-item"><span class="rel-name">' + p.prenom + '</span> <span class="rel-role">' + roleLabel + '</span> <span class="rel-affection">' + (lien.affection || 0) + '%</span></span>';
+      }
+      return null;
+    }).filter(Boolean);
+    return links.length ? links.join('') : '<span class="empty">Aucune relation significative.</span>';
+  }
+
+  function getCareerFinanceHtml() {
+    var parts = [];
+    if (state.career) {
+      var track = window.VIE.getCareerTrack ? window.VIE.getCareerTrack(state.career.track) : null;
+      if (track) {
+        var lvl = track.levels[state.career.level];
+        parts.push('💼 ' + lvl.name + ' (' + track.name + ' niv.' + (state.career.level + 1) + ')');
+      }
+    } else {
+      parts.push('💼 Sans emploi');
     }
+    if (state.finance) {
+      parts.push('💰 Épargne : ' + (window.VIE.util ? window.VIE.util.formatMoney(state.finance.compte || 0) : (state.finance.compte || 0) + '€'));
+    }
+    return parts.join(' | ') || '—';
   }
 
   // ── VŒUX DE FIN D'ANNÉE ──────────────────────────────────────
@@ -1224,7 +1335,7 @@
     var num = $("#year-fade-num"); if (num) num.textContent = state.year;
     var recap = $("#year-fade-recap");
     if (recap) {
-      var items = (state.yearLog || []).slice(-6);
+      var items = (state.yearLog || []).slice(-4);
       recap.innerHTML = items.length ? items.map(function (t) { return "<li>" + t + "</li>"; }).join("") : "<li>Une année calme.</li>";
     }
     state.yearLog = [];
@@ -1232,7 +1343,7 @@
     void fade.offsetWidth;
     fade.classList.add("show");
     clearTimeout(state._yearFadeTimer);
-    state._yearFadeTimer = setTimeout(function () { fade.classList.remove("show"); }, 2200);
+    state._yearFadeTimer = setTimeout(function () { fade.classList.remove("show"); }, 2500);
   }
 
   function stageName(age) {
