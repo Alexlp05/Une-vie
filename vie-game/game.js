@@ -804,7 +804,16 @@
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className = "choice-btn";
-        btn.textContent = choice.text;
+        
+        // Afficher le nom de la personne ciblée si la choix a un personId
+        var displayText = choice.text;
+        if (choice.personId && state.people && state.people[choice.personId]) {
+          var targetName = state.people[choice.personId].prenom;
+          displayText = choice.text + " <span class=\"choice-target\">— " + targetName + "</span>";
+        }
+        
+        btn.innerHTML = displayText;
+        
         if (choice.note) {
           var note = document.createElement("span");
           note.className = "choice-note";
