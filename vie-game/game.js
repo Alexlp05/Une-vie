@@ -342,6 +342,7 @@
     var seed = Math.floor(Math.random() * 0x100000000);
     if (window.VIE.rng) window.VIE.rng.init(seed);
 
+    // RESET COMPLET de toutes les variables globales
     gameOver = false;
     usedEvents = {};
     usedOpp = {};
@@ -349,6 +350,9 @@
     recentEvents = [];
     narrativeMemory = {};
     _lastEventWasPassive = false;
+    if (window.VIE.supabase) {
+      window.VIE.supabase.init();
+    }
 
     state = base;
     // Enregistrer l'état dans le state manager (pour les modules UI)
@@ -362,22 +366,8 @@
     state.birthYear = birthYear || state.year;
     state.year = state.birthYear;
 
-    // Charger depuis le cloud si connecté
-    if (window.VIE.supabase && window.VIE.supabase.isLoggedIn()) {
-      try {
-        var cloud = await window.VIE.supabase.loadGame();
-        if (cloud.ok && cloud.state) {
-          state = cloud.state;
-          // Garder les nouvelles infos de création
-          state.name = name;
-          state.sexe = sexe;
-          state.trait = trait;
-          state.archetypeBias = trait.bias || {};
-        }
-      } catch (e) {
-        console.warn("Impossible de charger la sauvegarde cloud:", e);
-      }
-    }
+    // NE PAS charger de sauvegarde cloud lors d'une nouvelle partie
+    // Le chargement se fait uniquement via le bouton "Charger"
 
     if (engine.state && engine.state.set) engine.state.set(state);
     state.world = engine.world ? engine.world.create() : worldStart();
@@ -777,7 +767,7 @@
     var stage = $("#story-stage");
     if (stage) stage.textContent = (th.icon || "📖") + " " + eventTypeLabel(event) + " · " + stageName(state.age);
     var title = $("#story-title"); if (title) title.textContent = event.title;
-    var text = $("#story-text"); if (text) text.textContent = event.text;
+    var text = $("#story-text"); if (text) text.innerHTML = renderEventText(event.text);
     var card = document.querySelector(".story-card");
     if (card) card.setAttribute("data-theme", theme);
 
@@ -847,6 +837,28 @@
     if (sc && sc.scrollIntoView) sc.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  /* ── RENDRE LES NOMS DE PERSONNES CLIQUABLES DANS LE TEXTE ────────── */
+  function renderEventText(text) {
+    if (!text || !state.people) return text;
+    
+    var html = text;
+    // Remplacer chaque prénom de personne connue par un lien cliquable
+    // On trie par longueur décroissante pour éviter les remplacements partiels
+    var people = Object.values(state.people).filter(function(p) { return p.id !== "self" && p.vivant; });
+    
+    // Trier par longueur de prénom décroissante
+    people.sort(function(a, b) { return (b.prenom || "").length - (a.prenom || "").length; });
+    
+    people.forEach(function(p) {
+      if (!p.prenom) return;
+      var prenom = p.prenom;
+      var regex = new RegExp("\\b" + prenom.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "g");
+      html = html.replace(regex, '<span class="person-link" data-person-id="' + p.id + '">' + prenom + '</span>');
+    });
+    
+    return html;
+  }
+
   function resolveChoice(event, choice, idx) {
     var engine = window.VIE.engine;
     var resultText = "";
@@ -854,8 +866,14 @@
     // ── 1. Snapshot avant (stats, argent, relations, passions, traits) ──
     var before = captureImpactSnapshot();
 
+    // Construire boundPeople si le choix cible une personne spécifique
+    var boundPeople = null;
+    if (choice.personId && state.people && state.people[choice.personId]) {
+      boundPeople = { p1: state.people[choice.personId] };
+    }
+
     if (engine.events && engine.events.resolveChoice) {
-      var res = engine.events.resolveChoice(state, event, choice, idx, null);
+      var res = engine.events.resolveChoice(state, event, choice, idx, boundPeople);
       resultText = res && (res.resultText || res.result) ? (res.resultText || res.result) : (choice.result || "");
     } else {
       // Fallback minimal
@@ -1513,11 +1531,65 @@
     if (menuBtn) menuBtn.addEventListener("click", function () { showCreation(); });
   }
 
+  /* ---------- Styles et gestion des liens de personnes ---------- */
+  function initPersonLinkStyles() {
+    // Injecter le CSS pour les liens de personnes
+    var style = document.createElement("style");
+    style.textContent = `
+      .person-link {
+        color: var(--gold);
+        text-decoration: underline;
+        cursor: pointer;
+        font-weight: bold;
+        padding: 1px 4px;
+        border-radius: 3px;
+        background: rgba(184, 134, 11, 0.15);
+        transition: all 0.2s ease;
+      }
+      .person-link:hover {
+        background: rgba(184, 134, 11, 0.35);
+        transform: scale(1.05);
+      }
+      .choice-target {
+        color: var(--gold);
+        text-decoration: underline;
+        cursor: pointer;
+        font-weight: bold;
+        padding: 1px 6px;
+        border-radius: 6px;
+        background: rgba(184, 134, 11, 0.2);
+        transition: all 0.2s ease;
+        margin-left: 4px;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .choice-target:hover {
+        background: rgba(184, 134, 11, 0.4);
+        transform: scale(1.1);
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Déléguer les clics sur les liens de personnes
+    document.addEventListener("click", function(e) {
+      var link = e.target.closest(".person-link, .choice-target");
+      if (link) {
+        e.preventDefault();
+        e.stopPropagation();
+        var personId = link.getAttribute("data-person-id");
+        if (personId && window.VIE.ui.personCard) {
+          window.VIE.ui.personCard.open(personId);
+        }
+      }
+    });
+  }
+
   /* ---------- Init ---------- */
   function init() {
     initTitle();
     initCreation();
     initGameActions();
+    initPersonLinkStyles();
   }
 
   if (document.readyState === "loading") {
