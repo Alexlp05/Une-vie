@@ -3042,8 +3042,471 @@ ev("retraite", "héritage_invisible", "Ce que vous laissez",
       effects: { bonheur: 4 }, result: "Ce qui reste, ce sont les gestes, les silences, l'amour donné. Le reste est bruit." }
   ], { type: "famille" });
 
+/* ============================================================
+   ÉVÉNEMENTS DE PERSONNALITÉ (30 nouveaux)
+   Liés aux traits Big Five et aux personnes existantes
+   ============================================================ */
+
+// ── PETITE ENFANCE (0-5) : Personnalité émergente ──
+
+ev("bebe", "pers_curiosite", "La curiosité de bébé",
+  "Une boîte s'ouvre, un objet roulote. Vous regardez avec des yeux émerveillés.",
+  [
+    { text: "Toucher tout, goûter, explorer.",
+      effects: { intelligence: 5, bonheur: 3 },
+      result: "Le monde est une merveille à déchirer, goûter, sentir." },
+    { text: "Observer, prudemment, depuis les bras.",
+      effects: { sante: 5, bonheur: 3 },
+      result: "La prudence, déjà, garde le cœur tranquille." }
+  ], { type: "perso", once: false, weight: 2 });
+
+ev("bebe", "pers_colere", "Le premier caprice",
+  "La faim, la fatigue, ou rien du tout. Vous pleurez, fort.",
+  [
+    { text: "Pleurer jusqu'à être entendu.",
+      effects: { bonheur: 3, stress: 3 },
+      result: "On vient. On console. On cède." },
+    { text: "Se blottir, se calmer, attendre.",
+      effects: { sante: 5, bonheur: 2 },
+      result: "Le calme revient. Vous savez déjà attendre." }
+  ], { type: "perso", once: false, weight: 2 });
+
+// ── ENFANCE (6-12) : Premiers traits sociaux ──
+
+ev("enfance", "pers_timide", "La peur de parler en public",
+  "La maîtresse demande qui veut réciter devant la classe. La main se lève... puis retombe.",
+  [
+    { text: "Se lever, malgré la peur.",
+      effects: { intelligence: 6, social: 4 },
+      result: "La voix tremble. Mais les mots sortent. On applaudit." },
+    { text: "Rester assis, regarder les autres.",
+      effects: { bonheur: 3 },
+      result: "Le soulagement. Et un petit regret, peut-être." }
+  ], { type: "perso", once: false, weight: 3 });
+
+ev("enfance", "pers_generosite", "Le goûter partagé",
+  "Vous avez une pomme. Un camarade n'en a pas. Son regard est discret, mais insistant.",
+  [
+    { text: "Couper en deux, offrir la moitié.",
+      effects: { social: 8, bonheur: 5 },
+      result: "Le goûter est meilleur à deux. Une amitié commence." },
+    { text: "Le garder, tout simplement.",
+      effects: { bonheur: 2 },
+      result: "La pomme est bonne. Mais le regard de l'autre vous suit." }
+  ], { type: "perso", once: false, weight: 3 });
+
+ev("enfance", "pers_menteur", "Le vase cassé",
+  "Le vase de maman est en morceaux sur le sol. Personne n'a rien vu. Personne sauf vous.",
+  [
+    { text: "Dire la vérité, prendre la punition.",
+      effects: { intelligence: 5, bonheur: 3 },
+      result: "La punition est légère. La confiance de maman, elle, grandit." },
+    { text: "Dire que c'est le chat.",
+      effects: { bonheur: 5 },
+      result: "Le chat est puni. Vous, vous savez." }
+  ], { type: "perso", once: false, weight: 2 });
+
+ev("enfance", "pers_competitif", "La course à l'école",
+  "La course de vitesse. Les autres enfants sont rapides. Vous êtes rapide aussi.",
+  [
+    { text: "Courir pour gagner, vraiment.",
+      effects: { sante: 6, bonheur: 4 },
+      result: "Vous arrivez premier. Ou deuxième. Peu importe, vous avez tout donné." },
+    { text: "Laisser gagner l'autre, pour la paix.",
+      effects: { social: 6, bonheur: 4 },
+      result: "L'autre sourit. Vous, vous savez ce que vous avez choisi." }
+  ], { type: "perso", once: false, weight: 2 });
+
+// ── ADOLESCENCE (13-17) : Identité et passions ──
+
+ev("ado", "pers_rebellion", "L'heure de couvre-feu",
+  "Il est 22h. Vos parents dorment. Une fête vous attend dehors, avec des amis.",
+  [
+    { text: "Sortir, en silence, prendre le risque.",
+      effects: { social: 8, bonheur: 8, energie: -5 },
+      result: "La nuit est belle. Les amis, la musique. Le risque, aussi." },
+    { text: "Rester, dormir, obéir.",
+      effects: { sante: 5, bonheur: 3 },
+      result: "Le matin, tout est calme. Mais une envie reste, quelque part." }
+  ], { type: "perso", once: false, weight: 3 });
+
+ev("ado", "pers_amitie_tendue", "La dispute avec ton meilleur ami",
+  "Une parole blessante. Un silence qui dure depuis trois jours. Vous vous manquez, mais l'orgueil résiste.",
+  [
+    { text: "Aller vers lui, présenter des excuses.",
+      effects: { social: 10, bonheur: 7 },
+      result: "L'amitié reprend, plus forte. La colère s'est évaporée." },
+    { text: "Attendre qu'il vienne, lui.",
+      effects: { bonheur: -3 },
+      result: "Les jours passent. L'ami aussi s'éloigne, peut-être pour toujours." }
+  ], { type: "relation", once: false, weight: 4 });
+
+ev("ado", "pers_confiance", "Le secret de l'autre",
+  "Votre meilleure amie vous confie un secret grave. Vous promettez de ne rien dire. Un autre ami le demande.",
+  [
+    { text: "Garder le secret, coûte que coûte.",
+      effects: { confiance: 8, bonheur: 5 },
+      result: "Le secret reste entre vous deux. La confiance, c'est ça." },
+    { text: "Le révéler, pour être compris.",
+      effects: { social: 5, confiance: -8 },
+      result: "On vous comprend. Mais votre amie ne vous regarde plus de la même façon." }
+  ], { type: "relation", once: false, weight: 2 });
+
+ev("ado", "pers_ambitieux", "Le projet d'avenir",
+  "Le conseiller d'orientation vous demande : « Et après le lycée, qu'est-ce que vous voulez faire ? »",
+  [
+    { text: "Avoir un projet précis, ambitieux.",
+      effects: { intelligence: 8, bonheur: 5 },
+      result: "Vous savez où vous allez. Le chemin sera long, mais tracé." },
+    { text: "Avouer que vous ne savez pas, encore.",
+      effects: { bonheur: 4 },
+      result: "L'incertitude est lourde. Mais elle laisse place à toutes les possibilités." }
+  ], { type: "carriere", once: false, weight: 3 });
+
+ev("ado", "pers_anxieux", "L'examen qui approche",
+  "Demain, l'examen. Vous avez révisé. Ou pas assez. Le cœur bat trop fort.",
+  [
+    { text: "Réviser toute la nuit.",
+      effects: { intelligence: 5, sante: -3 },
+      result: "Vous connaissez tout. Ou presque. La fatigue, elle, est là." },
+    { text: "Dormir, faire confiance au hasard.",
+      effects: { sante: 5, bonheur: 3 },
+      result: "Le sommeil revient. Le risque, aussi." }
+  ], { type: "perso", once: false, weight: 3 });
+
+// ── JEUNESSE (18-24) : Choix de vie ──
+
+ev("jeune", "pers_individualiste", "Le premier appartement",
+  "Vous emménagez seul(e). Le silence est nouveau. La liberté, aussi.",
+  [
+    { text: "Profiter de cette solitude, s'y épanouir.",
+      effects: { bonheur: 8, intelligence: 4 },
+      result: "Vous apprenez à vivre avec vous-même. Et c'est bon." },
+    { text: "Appeler des amis, remplir l'espace.",
+      effects: { social: 8, bonheur: 6 },
+      result: "L'appartement se remplit de rires. La solitude attendra." }
+  ], { type: "perso", once: false, weight: 3 });
+
+ev("jeune", "pers_volontaire", "Le premier échec professionnel",
+  "Le refus est dans l'email. « Votre candidature n'a pas été retenue. »",
+  [
+    { text: "Revenir encore, postuler ailleurs.",
+      effects: { intelligence: 5, bonheur: -3 },
+      result: "Le refus fait mal. Mais vous avancez. Toujours." },
+    { text: "Se demander si c'était le bon chemin.",
+      effects: { bonheur: -5 },
+      result: "Le doute s'installe. Et si vous vous trompiez de route ?" }
+  ], { type: "carriere", once: false, weight: 3 });
+
+ev("jeune", "pers_romantique", "La première histoire sérieuse",
+  "Les regards se prolongent. Les mains se cherchent. Vous sentez que c'est différent, cette fois.",
+  [
+    { text: "S'engager, totalement, sans filet.",
+      effects: { social: 8, bonheur: 10, confiance: 5 },
+      result: "Vous dites « je t'aime » sans compter. Le risque fait partie du jeu." },
+    { text: "Prendre son temps, se protéger.",
+      effects: { confiance: 5, bonheur: 4 },
+      result: "L'amour avance, doucement. Vous gardez une porte de sortie." }
+  ], { type: "amour", once: false, weight: 4 });
+
+// ── ÂGE ADULTE (25-40) : Responsabilités ──
+
+ev("adulte", "pers_genereux", "Le sans-abri dans la rue",
+  "Il est assis sur le trottoir, une main tendue, les yeux las. Vous passez devant.",
+  [
+    { text: "Donner ce que vous avez dans la poche.",
+      effects: { social: 6, bonheur: 6 },
+      result: "Il vous remercie, les larmes aux yeux. Vous partez plus léger." },
+    { text: "Passer votre chemin, vite.",
+      effects: { bonheur: -3 },
+      result: "Le regard vous suit. Vous marcherez vite, ce soir." }
+  ], { type: "perso", once: false, weight: 3 });
+
+ev("adulte", "pers_ambitieux_carriere", "La promotion qui divise",
+  "Une promotion arrive. Mais elle implique de déménager, loin de vos proches.",
+  [
+    { text: "Accepter, saisir l'opportunité.",
+      effects: { intelligence: 8, argent: 10, social: -5 },
+      result: "Vous partez. La carrière avance. Les visages familiers s'effacent un peu." },
+    { text: "Refuser, rester près des vôtres.",
+      effects: { social: 8, bonheur: 5 },
+      result: "Vous restez. La carrière attendra. Les proches, eux, sont là." }
+  ], { type: "carriere", once: false, weight: 3 });
+
+ev("adulte", "pers_patient", "L'attente du résultat médical",
+  "Le cabinet médical. L'enveloppe est fermée. Vous ne savez pas encore ce qu'elle contient.",
+  [
+    { text: "L'ouvrir, faire face, quoi qu'il arrive.",
+      effects: { sante: 3, confiance: 5 },
+      result: "Vous savez. Quoi qu'il en soit, vous affrontez." },
+    { text: "Laisser un proche l'ouvrir, pour vous.",
+      effects: { confiance: 3, bonheur: 4 },
+      result: "Quelqu'un de confiance lit pour vous. Vous n'êtes pas seul(e)." }
+  ], { type: "sante", once: false, weight: 2 });
+
+ev("adulte", "pers_sociable", "La soirée chez des inconnus",
+  "Une fête. Vous ne connaissez presque personne. La musique est forte, les rires sont forts.",
+  [
+    { text: "Aller vers les inconnus, lancer la conversation.",
+      effects: { social: 10, bonheur: 6 },
+      result: "De nouvelles têtes, de nouvelles histoires. La soirée est belle." },
+    { text: "Rester dans un coin, observer.",
+      effects: { bonheur: 3 },
+      result: "Vous regardez les autres s'amuser. C'est doux, aussi, d'être en retrait." }
+  ], { type: "social", once: false, weight: 3 });
+
+// ── MATURITÉ (40-60) : Bilans et choix ──
+
+ev("maturite", "pers_pardon", "La lettre d'excuses",
+  "Vous retrouvez une vieille lettre, non envoyée. Quelqu'un que vous avez blessé, il y a longtemps.",
+  [
+    { text: "L'envoyer, enfin.",
+      effects: { confiance: 8, bonheur: 7, social: 5 },
+      result: "La réponse vient. Le pardon aussi, peut-être." },
+    { text: "La déchirer, laisser le passé.",
+      effects: { bonheur: 3 },
+      result: "Certaines blessures se referment mieux sans mots." }
+  ], { type: "relation", once: false, weight: 2 });
+
+ev("maturite", "pers_financier", "L'achat impulsif",
+  "Une publicité, un objet qui brille, une carte de crédit. Vous n'en avez pas besoin. Vous le voulez.",
+  [
+    { text: "L'acheter, profiter maintenant.",
+      effects: { bonheur: 8, argent: -30 },
+      result: "L'objet est chez vous. Le plaisir dure quelques jours." },
+    { text: "Reporter, réfléchir, économiser.",
+      effects: { argent: 5, confiance: 3 },
+      result: "L'argent reste. La satisfaction, aussi, d'avoir attendu." }
+  ], { type: "argent", once: false, weight: 3 });
+
+ev("maturite", "pers_equilibre", "Le burn-out qui guette",
+  "Les semaines s'enchaînent, les nuits raccourcissent. Votre corps vous envoie des signaux.",
+  [
+    { text: "Prendre du repos, ralentir le rythme.",
+      effects: { sante: 8, bonheur: 6, energie: 5 },
+      result: "Vous vous écoutez. Le corps vous remercie." },
+    { text: "Continuer, coûte que coûte.",
+      effects: { energie: 5, sante: -5 },
+      result: "Vous tenez. Jusqu'à quand ?" }
+  ], { type: "sante", once: false, weight: 2 });
+
+ev("maturite", "pers_transmission", "L'enfant qui pose des questions",
+  "Votre enfant vous demande : « Qu'est-ce qui est vraiment important dans la vie ? »",
+  [
+    { text: "Lui répondre avec honnêteté, cœur ouvert.",
+      effects: { bonheur: 8, social: 6 },
+      result: "La conversation dure longtemps. Vous avez transmis quelque chose." },
+    { text: "Répondre par une phrase toute faite.",
+      effects: { bonheur: 2 },
+      result: "L'enfant accepte. Mais son regard cherche autre chose." }
+  ], { type: "famille", once: false, weight: 2 });
+
+// ── RETRAITE (60+) : Héritage et sagesse ──
+
+ev("retraite", "pers_sagesse", "Le petit-enfant qui demande conseil",
+  "Votre petit-enfant vous regarde, les yeux pleins de questions sur la vie.",
+  [
+    { text: "Raconter vos erreurs, pas seulement vos succès.",
+      effects: { bonheur: 8, social: 6 },
+      result: "L'enfant écoute, fasciné. Vous avez transmis quelque chose de vrai." },
+    { text: "Lui dire de suivre son propre chemin.",
+      effects: { bonheur: 6, confiance: 5 },
+      result: "L'enfant hoche la tête. Il fera ses propres erreurs, et ses propres victoires." }
+  ], { type: "famille", once: false, weight: 3 });
+
+ev("retraite", "pers_legue", "La lettre d'adieu",
+  "Vous écrivez ce que vous voulez laisser derrière vous. Pas des biens, mais des mots.",
+  [
+    { text: "L'écrire pour vos proches.",
+      effects: { bonheur: 8, social: 5 },
+      result: "Les mots restent. Ils porteront, après vous." },
+    { text: "Décider que rien n'est nécessaire.",
+      effects: { bonheur: 4 },
+      result: "Vous avez vécu. Cela suffit." }
+  ], { type: "famille", once: false, weight: 2 });
+
+// ── ÉVÉNEMENTS FINANCIERS RÉALISTES ──
+
+ev("jeune", "fin_depense_impulsion", "L'achat compulsif",
+  "Une publicité en ligne, un objet qui brille. Vous n'en avez pas besoin. Vous le voulez.",
+  [
+    { text: "L'acheter, profiter maintenant.",
+      effects: { bonheur: 6, argent: -15 },
+      result: "L'objet est chez vous. Le plaisir dure quelques jours." },
+    { text: "Reporter, réfléchir, économiser.",
+      effects: { argent: 5, confiance: 3 },
+      result: "L'argent reste. La satisfaction, aussi, d'avoir attendu." }
+  ], { type: "argent", once: false, weight: 4 });
+
+ev("jeune", "fin_premier_salaire", "Le premier vrai salaire",
+  "Le premier bulletin de paie tombe. L'argent est à vous. Vraiment.",
+  [
+    { text: "Tout dépenser, célébrer.",
+      effects: { bonheur: 8, argent: -20 },
+      result: "Une soirée mémorable. Le portefeuille est vide, le cœur est plein." },
+    { text: "Économiser, construire l'avenir.",
+      effects: { argent: 10, confiance: 5 },
+      result: "L'argent travaille pour vous. La sécurité grandit." }
+  ], { type: "argent", once: false, weight: 3 });
+
+ev("adulte", "fin_depense_medicale", "La facture médicale inattendue",
+  "Une douleur, un rendez-vous, une facture qui tombe. L'assurance ne couvre pas tout.",
+  [
+    { text: "Payer, sans discuter.",
+      effects: { argent: -25, sante: 5 },
+      result: "La santé n'a pas de prix. Mais elle a un coût." },
+    { text: "Reporter les soins, pour l'instant.",
+      effects: { argent: 5, sante: -5 },
+      result: "L'argent reste. La douleur, elle, attend." }
+  ], { type: "argent", once: false, weight: 3 });
+
+ev("adulte", "fin_investissement", "L'opportunité d'investissement",
+  "Un ami vous parle d'une affaire. Rentable, dit-il. Risquée, ajoute-t-il.",
+  [
+    { text: "Investir une partie de vos économies.",
+      effects: { argent: [10, 50], bonheur: 5 },
+      result: "L'investissement porte ses fruits. Votre argent travaille." },
+    { text: "Refuser, garder votre épargne en sécurité.",
+      effects: { argent: 5, confiance: 3 },
+      result: "L'argent dort. Mais il est là, quand vous en aurez besoin." }
+  ], { type: "argent", once: false, weight: 3 });
+
+ev("maturite", "fin_divorce_lien", "La séparation financière",
+  "Une séparation. Les comptes se séparent. Le patrimoine, aussi.",
+  [
+    { text: "Accepter le partage, tourner la page.",
+      effects: { argent: -40, bonheur: -5 },
+      result: "Vous repartez avec moins. Mais vous repartez libre." },
+    { text: "Se battre pour chaque euro.",
+      effects: { argent: 10, bonheur: -10, tension: 20 },
+      result: "Vous gardez plus. Mais la blessure est plus profonde." }
+  ], { type: "argent", once: false, weight: 2 });
+
+ev("retraite", "fin_retraite_reduite", "La retraite qui baisse",
+  "La caisse de retraite vous informe : votre pension sera plus faible que prévu.",
+  [
+    { text: "Ajuster votre style de vie.",
+      effects: { argent: -5, bonheur: 3 },
+      result: "Vous vivez avec moins. Mais vous vivez." },
+    { text: "Trouver un petit boulot, rester actif.",
+      effects: { argent: 15, energie: -3 },
+      result: "Vous travaillez encore. Mais à votre rythme." }
+  ], { type: "argent", once: false, weight: 2 });
+
+// ── ÉVÉNEMENTS LIÉS À DES PERSONNES EXISTANTES ──
+
+ev("ado", "pers_ami_loyal", "L'ami qui reste",
+  "Votre ami d'enfance est toujours là, même quand les autres sont partis. Il vous appelle ce soir.",
+  [
+    { text: "Lui répondre, passer du temps avec lui.",
+      effects: { social: 8, bonheur: 7, confiance: 5 },
+      result: "Vous revivez vos souvenirs d'enfance. L'amitié résiste au temps." },
+    { text: "Dire que vous êtes occupé, reporter.",
+      effects: { social: -3, bonheur: -2 },
+      result: "L'ami comprend. Mais l'éloignement s'installe, doucement." }
+  ], { type: "relation", once: false, weight: 3 });
+
+ev("ado", "pers_ami_toxique", "L'ami qui tire vers le bas",
+  "Cet ami vous entraîne dans des bêtises. Des ennuis. Vous commencez à douter de cette amitié.",
+  [
+    { text: "Continuer avec lui, par loyauté.",
+      effects: { social: 5, bonheur: -3, stress: 5 },
+      result: "Vous restez dans le groupe. Mais le malaise grandit." },
+    { text: "S'éloigner, doucement, définitivement.",
+      effects: { social: -5, bonheur: 5, confiance: 3 },
+      result: "Vous dites au revoir. Le poids s'allège, mais la solitude vient." }
+  ], { type: "relation", once: false, weight: 2 });
+
+ev("jeune", "pers_coloc", "Le colocataire qui change tout",
+  "Votre nouveau colocataire est différent de vous. Plus rangé. Plus bruyant. Plus tout.",
+  [
+    { text: "Apprendre à vivre avec ses différences.",
+      effects: { social: 6, intelligence: 4, bonheur: 4 },
+      result: "Vous apprenez de lui. Il apprend de vous. La colocation fonctionne." },
+    { text: "Lui demander de partir, trouver un autre.",
+      effects: { social: -5, argent: -10, bonheur: 3 },
+      result: "Vous vivez seul(e). Plus cher. Mais plus calme." }
+  ], { type: "relation", once: false, weight: 2 });
+
+ev("adulte", "pers_collegue_mentor", "Le mentor au travail",
+  "Un collègue plus âgé vous prend sous son aile. Il voit votre potentiel.",
+  [
+    { text: "Accepter son aide, apprendre de lui.",
+      effects: { intelligence: 8, respect: 8, bonheur: 6 },
+      result: "Vous progressez vite. Il devient une référence pour vous." },
+    { text: "Refuser, faire seul.",
+      effects: { intelligence: 3, confiance: 5 },
+      result: "Vous avancez à votre rythme. Mais plus lentement." }
+  ], { type: "carriere", once: false, weight: 3 });
+
+ev("adulte", "pers_conjoint_soutien", "Le conjoint dans l'épreuve",
+  "Vous traversez une période difficile. Votre conjoint est là, chaque jour, sans rien demander.",
+  [
+    { text: "Lui ouvrir votre cœur, tout lui dire.",
+      effects: { confiance: 10, bonheur: 8, social: 5 },
+      result: "Il écoute. Il comprend. Vous ne serez plus seul(e) dans l'épreuve." },
+    { text: "Garder pour vous, le protéger.",
+      effects: { confiance: 3, bonheur: -3 },
+      result: "Vous portez le fardeau seul(e). Il le sent, mais ne dit rien." }
+  ], { type: "amour", once: false, weight: 4 });
+
+ev("maturite", "pers_parent_age", "Le parent qui vieillit",
+  "Votre parent a du mal à se déplacer. Vous remarquez qu'il a besoin d'aide, de plus en plus souvent.",
+  [
+    { text: "Lui consacrer du temps, régulièrement.",
+      effects: { social: 8, bonheur: 6, energie: -3 },
+      result: "Vous passez des après-midis avec lui. Vous créez de nouveaux souvenirs." },
+    { text: "Lui proposer une aide extérieure, garder vos distances.",
+      effects: { social: 3, bonheur: -2 },
+      result: "Il est aidé. Mais vous sentez que quelque chose se brise, doucement." }
+  ], { type: "famille", once: false, weight: 3 });
+
+ev("maturite", "pers_enfant_adulte", "L'enfant qui part",
+  "Votre enfant quitte la maison pour ses études ou son travail. La maison est plus vide.",
+  [
+    { text: "Lui envoyer des messages, l'appeler souvent.",
+      effects: { social: 6, bonheur: 5 },
+      result: "Le lien reste fort, malgré la distance." },
+    { text: "Laisser son indépendance, ne pas le déranger.",
+      effects: { bonheur: -2 },
+      result: "La maison est silencieuse. Vous vous habituez, lentement." }
+  ], { type: "famille", once: false, weight: 3 });
+
+ev("retraite", "pers_ami_retraite", "L'ami qui prend sa retraite aussi",
+  "Votre meilleur ami prend sa retraite, lui aussi. Vous avez maintenant tout votre temps, tous les deux.",
+  [
+    { text: "Voyager ensemble, réaliser vos projets d'enfance.",
+      effects: { bonheur: 10, social: 8 },
+      result: "Vous partez à l'aventure. La vie reprend, différemment." },
+    { text: "Chacun chez soi, se voir parfois.",
+      effects: { social: 5, bonheur: 4 },
+      result: "Vous vous voyez de temps en temps. C'est suffisant, ainsi." }
+  ], { type: "relation", once: false, weight: 2 });
+
+ev("retraite", "pers_legende", "L'héritage des histoires",
+  "Vos petits-enfants vous demandent de raconter votre vie. Vous avez tant à leur dire.",
+  [
+    { text: "Raconter tout, les réussites comme les échecs.",
+      effects: { bonheur: 8, social: 6 },
+      result: "Ils écoutent, les yeux brillants. Votre histoire les inspire." },
+    { text: "Raconter seulement les beaux moments.",
+      effects: { bonheur: 6 },
+      result: "Ils rient, émerveillés. Mais vous savez qu'il y a plus, sous le récit." }
+  ], { type: "famille", once: false, weight: 2 });
+
+ev("retraite", "pers_deces_ami", "La perte d'un ami d'enfance",
+  "Un ami d'enfance est parti. Vous vous rendez compte à quel point il comptait pour vous.",
+  [
+    { text: "Aller à ses funérailles, honorer sa mémoire.",
+      effects: { social: 5, bonheur: -5 },
+      result: "Vous pleurez. Vous vous souvenez. Vous ne l'oublierez pas." },
+    { text: "Ne pas y aller, garder vos souvenirs.",
+      effects: { bonheur: -8 },
+      result: "Vous ne dites pas au revoir. Mais le vide reste, tout pareil." }
+  ], { type: "famille", once: false, weight: 3 });
+
 /* ------------------------------------------------------------
-   Événements jalons (forcés à certains âges)
+   ÉVÉNEMENTS JALONS (forcés à certains âges)
    ------------------------------------------------------------ */
 var MILESTONES = {
   18: {

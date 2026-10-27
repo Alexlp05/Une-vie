@@ -5,27 +5,27 @@
 
 // ── PRÉNOMS FRANÇAIS PAR DÉCENNIE ( INSEE tendances ) ──────
 var PRENOMS_FR_H = {
-  1940: ["Jean", "Michel", "Pierre", "André", "Philippe", "Alain", "Patrick", "Bernard", "Daniel", "Christian"],
-  1950: ["Philippe", "Christophe", "Patrick", "Stéphane", "Laurent", "Thierry", "Pascal", "Eric", "Bruno", "Olivier"],
-  1960: ["Stéphane", "Christophe", "David", "Frédéric", "Sébastien", "Nicolas", "Laurent", "Olivier", "Thierry", "Guillaume"],
-  1970: ["Nicolas", "Thomas", "Alexandre", "Antoine", "Julien", "Kevin", "Maxime", "Jérémy", "Guillaume", "Aurélien"],
-  1980: ["Thomas", "Nicolas", "Alexandre", "Antoine", "Kevin", "Maxime", "Jérémy", "Julien", "Guillaume", "Romain"],
-  1990: ["Lucas", "Hugo", "Nathan", "Enzo", "Léo", "Louis", "Théo", "Tom", "Noah", "Gabriel"],
-  2000: ["Léo", "Lucas", "Hugo", "Nathan", "Enzo", "Gabriel", "Louis", "Raphaël", "Arthur", "Jules"],
-  2010: ["Gabriel", "Léo", "Louis", "Raphaël", "Arthur", "Jules", "Adam", "Hugo", "Noah", "Maël"],
-  2020: ["Gabriel", "Léo", "Louis", "Maël", "Raphaël", "Jules", "Adam", "Noah", "Arthur", "Sacha"]
+  1940: ["Jean", "Michel", "Pierre", "André", "Philippe", "Alain", "Patrick", "Bernard", "Daniel", "Christian", "Henri", "Robert", "Louis", "Charles", "Henri", "Jacques", "Raymond", "Roger", "Albert", "Marcel"],
+  1950: ["Philippe", "Christophe", "Patrick", "Stéphane", "Laurent", "Thierry", "Pascal", "Eric", "Bruno", "Olivier", "Gérard", "Serge", "Yves", "Guy", "Jacques", "Henri", "René", "Jean-Pierre", "Michel-Ange", "Franck"],
+  1960: ["Stéphane", "Christophe", "David", "Frédéric", "Sébastien", "Nicolas", "Laurent", "Olivier", "Thierry", "Guillaume", "Régis", "Fabrice", "Cyril", "Anthony", "Vincent", "Gilles", "Denis", "Didier", "Luc", "Christian"],
+  1970: ["Nicolas", "Thomas", "Alexandre", "Antoine", "Julien", "Kevin", "Maxime", "Jérémy", "Guillaume", "Aurélien", "Raphaël", "Victor", "Bastien", "Lucas", "Quentin", "Arnaud", "Sylvain", "Bruno", "Fabien", "Damien"],
+  1980: ["Thomas", "Nicolas", "Alexandre", "Antoine", "Kevin", "Maxime", "Jérémy", "Julien", "Guillaume", "Romain", "Xavier", "Robin", "Mathieu", "Fabien", "Adrien", "Simon", "Florian", "Yoann", "Clément", "Lucas"],
+  1990: ["Lucas", "Hugo", "Nathan", "Enzo", "Léo", "Louis", "Théo", "Tom", "Noah", "Gabriel", "Clément", "Ethan", "Mathis", "Rayan", "Adam", "Samuel", "Titouan", "Oscar", "Victor", "Martin"],
+  2000: ["Léo", "Lucas", "Hugo", "Nathan", "Enzo", "Gabriel", "Louis", "Raphaël", "Arthur", "Jules", "Adam", "Aaron", "Maël", "Noa", "Sacha", "Victor", "Ethan", "Oscar", "Raphaël", "Julien"],
+  2010: ["Gabriel", "Léo", "Louis", "Raphaël", "Arthur", "Jules", "Adam", "Hugo", "Noah", "Maël", "Naël", "Sacha", "Ethan", "Oscar", "Victor", "Eliott", "Adam", "Arthur", "Louis", "Gabriel"],
+  2020: ["Gabriel", "Léo", "Louis", "Maël", "Raphaël", "Jules", "Adam", "Noah", "Arthur", "Sacha", "Noa", "Liam", "Oscar", "Victor", "Eliott", "Adam", "Gabriel", "Louis", "Léo", "Maël"]
 };
 
 var PRENOMS_FR_F = {
-  1940: ["Marie", "Monique", "Martine", "Nicole", "Françoise", "Christiane", "Michèle", "Catherine", "Sylvie", "Isabelle"],
-  1950: ["Catherine", "Nathalie", "Isabelle", "Sylvie", "Véronique", "Christine", "Sandrine", "Patricia", "Laurence", "Caroline"],
-  1960: ["Sandrine", "Stéphanie", "Nathalie", "Céline", "Caroline", "Laurence", "Virginie", "Sophie", "Audrey", "Emilie"],
-  1970: ["Marie", "Aurélie", "Emilie", "Elodie", "Céline", "Laura", "Marine", "Justine", "Pauline", "Jennifer"],
-  1980: ["Marie", "Laura", "Emilie", "Julie", "Elodie", "Camille", "Manon", "Pauline", "Morgane", "Charlotte"],
-  1990: ["Marie", "Manon", "Camille", "Océane", "Laura", "Clara", "Léa", "Chloé", "Manon", "Emma"],
-  2000: ["Emma", "Chloé", "Léa", "Manon", "Inès", "Lola", "Jade", "Louise", "Zoé", "Chloé"],
-  2010: ["Emma", "Louise", "Jade", "Chloé", "Alice", "Léa", "Manon", "Lina", "Rose", "Anna"],
-  2020: ["Jade", "Emma", "Louise", "Alice", "Lina", "Rose", "Chloé", "Léa", "Anna", "Mia"]
+  1940: ["Marie", "Monique", "Martine", "Nicole", "Françoise", "Christiane", "Michèle", "Catherine", "Sylvie", "Isabelle", "Jeanne", "Lucienne", "Renée", "Paulette", "Yvonne", "Andrée", "Simone", "Germaine", "Julienne", "Danièle"],
+  1950: ["Catherine", "Nathalie", "Isabelle", "Sylvie", "Véronique", "Christine", "Sandrine", "Patricia", "Laurence", "Caroline", "Françoise", "Hélène", "Colette", "Simone", "Geneviève", "Danièle", "Monique", "Jeanne", "Yvette", "Micheline"],
+  1960: ["Sandrine", "Stéphanie", "Nathalie", "Céline", "Caroline", "Laurence", "Virginie", "Sophie", "Audrey", "Emilie", "Valérie", "Coralie", "Delphine", "Karine", "Estelle", "Nathalie", "Chantal", "Béatrice", "Florence", "Patricia"],
+  1970: ["Marie", "Aurélie", "Emilie", "Elodie", "Céline", "Laura", "Marine", "Justine", "Pauline", "Jennifer", "Stéphanie", "Karine", "Vanessa", "Audrey", "Coralie", "Laetitia", "Delphine", "Sophie", "Agnès", "Françoise"],
+  1980: ["Marie", "Laura", "Emilie", "Julie", "Elodie", "Camille", "Manon", "Pauline", "Morgane", "Charlotte", "Sophie", "Claire", "Fanny", "Delphine", "Audrey", "Sophie", "Céline", "Delphine", "Audrey", "Isabelle"],
+  1990: ["Marie", "Manon", "Camille", "Océane", "Laura", "Clara", "Léa", "Chloé", "Manon", "Emma", "Julie", "Amandine", "Justine", "Virginie", "Elise", "Marion", "Pauline", "Claire", "Audrey", "Laura"],
+  2000: ["Emma", "Chloé", "Léa", "Manon", "Inès", "Lola", "Jade", "Louise", "Zoé", "Chloé", "Charlotte", "Anaïs", "Clémence", "Pauline", "Lucie", "Manon", "Léa", "Emma", "Inès", "Lola"],
+  2010: ["Emma", "Louise", "Jade", "Chloé", "Alice", "Léa", "Manon", "Lina", "Rose", "Anna", "Mila", "Inès", "Rose", "Lina", "Agathe", "Zoé", "Léa", "Emma", "Chloé", "Jade"],
+  2020: ["Jade", "Emma", "Louise", "Alice", "Lina", "Rose", "Chloé", "Léa", "Anna", "Mia", "Anna", "Lina", "Rose", "Chloé", "Emma", "Lina", "Emma", "Louise", "Alice", "Lina"]
 };
 
 // ── NOMS FRANÇAIS (top 100) ───────────────────────────────
@@ -37,7 +37,10 @@ var NOMS_FR = [
   "Perrin", "Morin", "Mathieu", "Clement", "Gauthier", "Dumont", "Lopez", "Fontaine", "Chevalier", "Robin",
   "Masson", "Sanchez", "Gerard", "Nguyen", "Noel", "Meyer", "Lucas", "Meunier", "Jean", "Denis",
   "Martel", "Rolland", "Marie", "Gillet", "Lemaire", "Duval", "Colin", "Barbier", "Brun", "Roy",
-  "Picard", "Roger", "Vidal", "Martinez", "Lacroix", "Olivier", "Leblanc", "Leclercq", "Vial", "Collet"
+  "Picard", "Roger", "Vidal", "Martinez", "Lacroix", "Olivier", "Leblanc", "Leclercq", "Vial", "Collet",
+  "Fabre", "Clement", "Dumas", "Duval", "Leroux", "Bertrand", "Guillaume", "Schmitt", "Henry", "Bois",
+  "Fabre", "Rousseau", "Dupont", "Leroy", "Moreau", "Simon", "Laurent", "Lefebvre", "Michel", "Garcia",
+  "David", "Bertrand", "Roux", "Vincent", "Fournier", "Morel", "Girard", "Dupont", "Lambert", "Bonnet"
 ];
 
 // ── PRÉNOMS PAR CULTURE MIGRANTE ──────────────────────────
@@ -71,6 +74,16 @@ var PRENOMS_MIGRANTS = {
     H: ["Jean", "Marie", "Pierre", "Louis", "Andre", "Michel", "Paul", "Jacques", "Nicolas", "Alexandre", "Kevin", "Bryan", "Jordan", "Mickael", "Rudy"],
     F: ["Marie", "Nathalie", "Sylvie", "Catherine", "Isabelle", "Christine", "Sandrine", "Veronique", "Patricia", "Laurence", "Jessica", "Jennifer", "Cindy", "Stephanie", "Melanie"],
     noms: ["Jean-Baptiste", "Joseph", "Louis", "Pierre", "Andre", "Michel", "Paul", "Simon", "Robert", "Henry", "Noel", "Blanc", "Petit", "Bernard", "Lambert"]
+  },
+  asie_du_sud: {
+    H: ["Rajesh", "Amit", "Sanjay", "Rahul", "Vikram", "Arjun", "Karan", "Rohan", "Siddharth", "Varun", "Kabir", "Aryan", "Dev", "Ishaan", "Krishna"],
+    F: ["Priya", "Anjali", "Pooja", "Kavya", "Diya", "Anika", "Sana", "Zara", "Alisha", "Tara", "Meera", "Kavya", "Diya", "Anika", "Sana"],
+    noms: ["Sharma", "Singh", "Kumar", "Patel", "Shah", "Desai", "Joshi", "Mishra", "Tiwari", "Gupta", "Yadav", "Verma", "Reddy", "Naidu", "Iyer"]
+  },
+  moyen_orient: {
+    H: ["Omar", "Karim", "Samir", "Amir", "Karim", "Yasser", "Tarek", "Nabil", "Rami", "Walid", "Hassan", "Ali", "Khaled", "Samir", "Tariq"],
+    F: ["Layla", "Amira", "Leila", "Noor", "Salma", "Yasmin", "Fatima", "Zahra", "Mariam", "Khadija", "Safiya", "Huda", "Sana", "Hala", "Dalal"],
+    noms: ["Al-Farsi", "Al-Mansouri", "Al-Hamad", "Al-Sayed", "Al-Ghamdi", "Al-Zahrani", "Al-Qahtani", "Al-Dosari", "Al-Harbi", "Al-Otaibi"]
   }
 };
 

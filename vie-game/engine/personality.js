@@ -1,5 +1,7 @@
 /* ============================================================
-   UNE VIE v0.5 — PERSONNALITÉ (Big Five + traits + évolution)
+   UNE VIE v0.8 — PERSONNALITÉ (Big Five + traits + évolution)
+   Système complet : naissance, évolution annuelle, événements,
+   introspection, descriptions qualitatives, historique.
    ============================================================ */
 
 (function () {
@@ -8,9 +10,9 @@
   // ── TIREAGE NAISSANCE ────────────────────────────────────
   function generatePersonalityAtBirth(opts) {
     opts = opts || {};
-    var parents = opts.parents || [];           // array de {personality:{O,C,E,A,N}}
-    var origin = opts.origin || null;           // id origine
-    var archetype = opts.archetype || null;     // id archétype
+    var parents = opts.parents || [];
+    var origin = opts.origin || null;
+    var archetype = opts.archetype || null;
     var rng = window.VIE && window.VIE.rng ? window.VIE.rng : Math;
 
     var cfg = window.VIE.config.personality;
@@ -32,16 +34,16 @@
     if (origin && window.VIE.data.origins) {
       var o = window.VIE.data.origins.find(function (x) { return x.id === origin; });
       if (o && o.traitsBoost) {
-        // Convertir traits en biais Big Five approximatif
         var traitToBigFive = {
           loyal: {A:+10}, travailleur: {C:+10}, solidaire: {A:+10},
           perfectionniste: {C:+10}, ambitieux: {C:+10, E:+5}, casanier: {E:-10},
           orgeilleux: {A:-10, N:+5}, nostalgique: {O:-5, N:+5}, protecteur: {A:+10, C:+5},
           creatif: {O:+15}, reveur: {O:+10, N:+5}, romantique: {A:+10, N:+5},
-          loyal: {A:+10}, courageux: {N:-10}, independant: {A:-5, C:+5},
+          courageux: {N:-10}, independant: {A:-5, C:+5},
           curieux: {O:+15}, intellectuel: {O:+15}, rigide: {C:+10, O:-10},
-          manuel: {C:+5}, Bavard: {E:+10, A:-5}, charmeur: {E:+10, A:-5},
-          fidele: {A:+15}
+          manuel: {C:+5}, bavard: {E:+10, A:-5}, charmeur: {E:+10, A:-5},
+          fidele: {A:+15}, anxieux: {N:+15}, extraverti: {E:+15},
+          calme: {N:-10}, generueux: {A:+10}, orgueilleux: {N:+5, A:-5}
         };
         o.traitsBoost.forEach(function (t) {
           var bias = traitToBigFive[t];
@@ -77,7 +79,6 @@
       var arch = window.VIE.getArchetype(archetype);
       if (arch && arch.trait) traits.push(arch.trait);
     }
-    // 1-2 traits aléatoires cohérents
     var allTraits = window.VIE.getAllDiscreteTraits ? window.VIE.getAllDiscreteTraits() : [];
     var compatible = allTraits.filter(function (t) {
       var def = window.VIE.getTrait(t);
@@ -87,7 +88,22 @@
       if (!traits.includes(t)) traits.push(t);
     });
 
-    return { personality: personality, traits: traits };
+    // 6. Historique de personnalité pour suivi
+    var history = [{
+      age: 0,
+      personality: JSON.parse(JSON.stringify(personality)),
+      traits: traits.slice(),
+      reason: "Naissance",
+      description: describePersonality(personality, traits)
+    }];
+
+    return {
+      personality: personality,
+      traits: traits,
+      history: history,
+      archetype: archetype || null,
+      origin: origin || null
+    };
   }
 
   function isCompatibleWithPersonality(traitDef, personality) {
@@ -96,10 +112,9 @@
     Object.keys(traitDef.compat).forEach(function (dim) {
       var target = traitDef.compat[dim];
       var actual = personality[dim] || 50;
-      // Plus la personnalité est proche de la cible, plus compatible
       score -= Math.abs(actual - 50 - target) * 0.1;
     });
-    return score > -15; // seuil arbitraire
+    return score > -15;
   }
 
   // ── ÉVOLUTION ANNUELLE ───────────────────────────────────
@@ -107,18 +122,15 @@
     var age = state.age;
     var cfg = window.VIE.config.personality;
 
-    // Plasticité selon âge
     var plasticity = cfg.plasticity.find(function (p) { return age <= p.ageMax; }) || cfg.plasticity[cfg.plasticity.length - 1];
     var maxDelta = plasticity.maxDelta;
 
-    // Maturation naturelle
     var maturation = cfg.maturation;
     var deltas = { O: 0, C: 0, E: 0, A: 0, N: 0 };
     Object.keys(maturation).forEach(function (d) {
       deltas[d] += maturation[d];
     });
 
-    // Événements marquants (via flags mémoire)
     if (state.narrativeMemory) {
       if (state.narrativeMemory.traumaRecente) {
         deltas.N += cfg.traumaMaxDelta * 0.5;
@@ -126,46 +138,149 @@
         deltas.A -= cfg.traumaMaxDelta * 0.2;
       }
       if (state.narrativeMemory.succesMajeur) {
-        deltas.C += 2; deltas.confiance += 3;
+        deltas.C += 2; deltas.A += 1;
       }
       if (state.narrativeMemory.therapie) {
         deltas.N -= 3; deltas.A += 2; deltas.C += 1;
       }
+      if (state.narrativeMemory.mariage) {
+        deltas.A += 2; deltas.N -= 2;
+      }
+      if (state.narrativeMemory.divorce) {
+        deltas.N += 3; deltas.A -= 2; deltas.C -= 1;
+      }
+      if (state.narrativeMemory.naissance_enfant) {
+        deltas.A += 2; deltas.N -= 1;
+      }
+      if (state.narrativeMemory.deces_proche) {
+        deltas.N += 2; deltas.A -= 1;
+      }
     }
 
-    // Stress chronique inverse la maturation
     if (state.stats && state.stats.stress > 70) {
       deltas.N += 1; deltas.C -= 1; deltas.A -= 1;
     }
+    if (state.stats && state.stats.stress < 30) {
+      deltas.N -= 1; deltas.C += 1;
+    }
 
-    // Appliquer avec clamp + maxDelta
+    if (state.stats && state.stats.bonheur >= 70) {
+      deltas.N -= 1; deltas.A += 1;
+    }
+    if (state.stats && state.stats.bonheur <= 30) {
+      deltas.N += 1; deltas.A -= 1;
+    }
+
+    if (state.stats && state.stats.energie >= 70) {
+      deltas.E += 1;
+    }
+    if (state.stats && state.stats.energie <= 30) {
+      deltas.E -= 1;
+    }
+
+    var changes = [];
     Object.keys(deltas).forEach(function (d) {
       var dlt = clamp(deltas[d], -maxDelta, maxDelta);
-      state.personality[d] = clamp(state.personality[d] + dlt, 0, 100);
+      if (dlt !== 0) {
+        var oldVal = state.personality[d];
+        state.personality[d] = clamp(state.personality[d] + dlt, 0, 100);
+        changes.push({ dim: d, old: oldVal, new: state.personality[d], delta: dlt });
+      }
     });
 
-    // Acquisition / perte traits discrets par répétition
+    var significantChange = changes.some(function (c) { return Math.abs(c.delta) >= 2; });
+    if (significantChange || age % 5 === 0) {
+      state.personalityHistory = state.personalityHistory || [];
+      state.personalityHistory.push({
+        age: age,
+        personality: JSON.parse(JSON.stringify(state.personality)),
+        traits: (state.traits || []).slice(),
+        changes: changes,
+        description: describePersonality(state.personality, state.traits || [])
+      });
+    }
+
     evolveDiscreteTraits(state);
   }
 
   function evolveDiscreteTraits(state) {
-    // Logique simplifiée : si un comportement répété 5 fois → trait
-    // Sera implémenté via interactions.js qui track les comportements
+    var cfg = window.VIE.config.personality;
+    var traits = state.traits || [];
+    var allTraits = window.VIE.getAllDiscreteTraits ? window.VIE.getAllDiscreteTraits() : [];
+    var age = state.age;
+    var baseChance = 0.02;
+
+    if (age < 25) baseChance = 0.05;
+    else if (age < 40) baseChance = 0.03;
+    else if (age < 60) baseChance = 0.02;
+    else baseChance = 0.01;
+
+    var personality = state.personality || { O: 50, C: 50, E: 50, A: 50, N: 50 };
+    var candidateTraits = [];
+
+    allTraits.forEach(function (t) {
+      if (traits.includes(t)) return;
+      var def = window.VIE.getTrait(t);
+      if (!def) return;
+      if (!isCompatibleWithPersonality(def, personality)) return;
+
+      var chance = baseChance;
+      if (def.compat) {
+        Object.keys(def.compat).forEach(function (dim) {
+          var target = def.compat[dim];
+          var actual = personality[dim] || 50;
+          if (Math.abs(actual - 50) >= Math.abs(target)) {
+            chance += 0.02;
+          }
+        });
+      }
+
+      if (Math.random() < chance) {
+        candidateTraits.push(t);
+      }
+    });
+
+    if (candidateTraits.length > 0) {
+      var newTrait = candidateTraits[Math.floor(Math.random() * candidateTraits.length)];
+      traits.push(newTrait);
+      state.traits = traits;
+
+      state.personalityHistory = state.personalityHistory || [];
+      var lastEntry = state.personalityHistory[state.personalityHistory.length - 1];
+      if (lastEntry && lastEntry.age === state.age) {
+        lastEntry.newTraits = lastEntry.newTraits || [];
+        lastEntry.newTraits.push(newTrait);
+      }
+    }
+
+    if (age > 60 && traits.length > 3 && Math.random() < 0.01) {
+      var loseTrait = traits[Math.floor(Math.random() * traits.length)];
+      var arch = state.archetype ? window.VIE.getArchetype(state.archetype) : null;
+      if (arch && arch.trait === loseTrait) return;
+      var idx = traits.indexOf(loseTrait);
+      if (idx >= 0) {
+        traits.splice(idx, 1);
+        state.traits = traits;
+      }
+    }
   }
 
-  // ── INTROSPECTION (ce que le joueur voit de lui-même) ────
+  // ── INTROSPECTION ────
   function getVisiblePersonality(state) {
     var age = state.age;
-    var lucidity = Math.min(100, (age - 14) * 3); // 0 à 14 ans, +3/an
-    if (state.flags.includes("therapie")) lucidity += 20;
+    var lucidity = Math.min(100, Math.max(0, (age - 14) * 3));
+    if (state.flags && state.flags.includes("therapie")) lucidity += 20;
     if (state.narrativeMemory && state.narrativeMemory.traumaRecente) lucidity += 15;
+    if (age >= 60) lucidity = Math.min(100, lucidity + 10);
 
     var visible = {};
     Object.keys(state.personality).forEach(function (d) {
       var real = state.personality[d];
-      if (lucidity >= 80) visible[d] = real;
-      else if (lucidity >= 50) visible[d] = Math.round(real * 0.7 + 50 * 0.3); // flou vers moyenne
-      else visible[d] = 50; // inconnu
+      if (lucidity >= 85) visible[d] = real;
+      else if (lucidity >= 65) visible[d] = Math.round(real * 0.8 + 50 * 0.2);
+      else if (lucidity >= 45) visible[d] = Math.round(real * 0.6 + 50 * 0.4);
+      else if (lucidity >= 25) visible[d] = Math.round(real * 0.4 + 50 * 0.6);
+      else visible[d] = 50;
     });
     visible.lucidity = lucidity;
     return visible;
@@ -173,30 +288,62 @@
 
   function getVisibleTraits(state) {
     var lucidity = getVisiblePersonality(state).lucidity;
-    if (lucidity >= 70) return state.traits.slice();
-    if (lucidity >= 40) return state.traits.slice(0, Math.ceil(state.traits.length * 0.6));
-    return []; // "Vous ne vous connaissez pas encore bien"
+    if (lucidity >= 80) return (state.traits || []).slice();
+    if (lucidity >= 60) return (state.traits || []).slice(0, Math.ceil((state.traits || []).length * 0.75));
+    if (lucidity >= 40) return (state.traits || []).slice(0, Math.ceil((state.traits || []).length * 0.5));
+    if (lucidity >= 25) return (state.traits || []).slice(0, 1);
+    return [];
   }
 
   // ── DESCRIPTION QUALITATIVE ──────────────────────────────
   function describePersonality(personality, traits) {
     var parts = [];
     var dims = { O: "curieux", C: "organisé", E: "sociable", A: "bienveillant", N: "anxieux" };
+    var dimNames = { O: "Ouverture", C: "Conscience", E: "Extraversion", A: "Agréabilité", N: "Névrosisme" };
     Object.keys(personality).forEach(function (d) {
       var v = personality[d];
-      if (v >= 70) parts.push("très " + dims[d]);
-      else if (v >= 60) parts.push("assez " + dims[d]);
-      else if (v <= 30) parts.push("peu " + dims[d]);
-      else if (v <= 40) parts.push("plutôt " + (d === "N" ? "stable" : "réservé"));
+      var label = dimNames[d] || d;
+      if (v >= 85) parts.push("très " + dims[d] + " (" + label + ")");
+      else if (v >= 70) parts.push("assez " + dims[d] + " (" + label + ")");
+      else if (v >= 60) parts.push("plutôt " + dims[d] + " (" + label + ")");
+      else if (v <= 15) parts.push("très peu " + dims[d] + " (" + label + ")");
+      else if (v <= 25) parts.push("peu " + dims[d] + " (" + label + ")");
+      else if (v <= 35) parts.push("moins " + dims[d] + " (" + label + ")");
+      else if (v <= 45) parts.push("plutôt " + (d === "N" ? "stable" : "réservé") + " (" + label + ")");
     });
-    if (traits.length) parts.push("(" + traits.slice(0, 3).join(", ") + ")");
-    return parts.join(", ") || "équilibré";
+    if (traits.length) parts.push("Traits : " + traits.slice(0, 4).join(", "));
+    return parts.length ? parts.join(", ") : "équilibré";
   }
 
-  // Helpers
+  function getPersonalityHistory(state) {
+    return state.personalityHistory || [];
+  }
+
+  function getPersonalitySummary(state) {
+    var pers = state.personality || { O: 50, C: 50, E: 50, A: 50, N: 50 };
+    var traits = state.traits || [];
+    var visible = getVisiblePersonality(state);
+    var dominant = [];
+    Object.keys(pers).forEach(function (d) {
+      var v = pers[d];
+      if (v >= 75) dominant.push({ dim: d, val: v, name: dimNames[d] || d });
+      else if (v <= 25) dominant.push({ dim: d, val: v, name: dimNames[d] || d, inverse: true });
+    });
+    dominant.sort(function (a, b) { return Math.abs(b.val - 50) - Math.abs(a.val - 50); });
+    return {
+      personality: pers,
+      visible: visible,
+      traits: traits,
+      dominant: dominant.slice(0, 3),
+      description: describePersonality(pers, traits),
+      history: getPersonalityHistory(state)
+    };
+  }
+
+  var dimNames = { O: "Ouverture", C: "Conscience", E: "Extraversion", A: "Agréabilité", N: "Névrosisme" };
+
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
-  // Export
   window.VIE = window.VIE || {};
   window.VIE.engine = window.VIE.engine || {};
   window.VIE.engine.personality = {
@@ -204,6 +351,8 @@
     evolve: evolvePersonality,
     getVisible: getVisiblePersonality,
     getVisibleTraits: getVisibleTraits,
-    describe: describePersonality
+    describe: describePersonality,
+    getPersonalityHistory: getPersonalityHistory,
+    getPersonalitySummary: getPersonalitySummary
   };
 })();
